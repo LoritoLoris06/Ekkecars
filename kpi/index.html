@@ -233,6 +233,7 @@ details.more[open] summary{margin-bottom:8px}
 @media (max-width:860px){.sess-body{grid-template-columns:1fr}}
 .cnt{display:grid;grid-template-columns:repeat(5,1fr);background:var(--surface)}
 .cnt.three{grid-template-columns:repeat(3,1fr)}
+.cnt.four{grid-template-columns:repeat(4,1fr)}
 .cnt div{padding:12px 10px;text-align:center;border-right:1px solid var(--line);min-width:0}
 .cnt div:last-child{border-right:0}
 .cnt b{display:block;font-family:var(--f-head);font-weight:900;font-size:24px;line-height:1.1}
@@ -364,9 +365,9 @@ const lsSet=(k,v)=>{try{if(v==null)localStorage.removeItem(k);else localStorage.
 
 const LKEYS=[['contattati','Leads contattati'],['risposti','Risposte'],['interessati','Interessati'],['validi','Validi'],['ricerche','Ricerche fatte'],['proposte','Proposte fatte'],['trattative','Leasing / trattative']];
 const LEXTRA=[['permNo','Senza permuta'],['permOk','Permute valide'],['permKo','Permute non valide'],['rem','Remarketing'],['post','Posticipati'],['risentire','Da risentire']];
-const DKEYS=[['ricerche','Ricerche fatte'],['prezzi','Prezzi validi'],['proposte','Proposte fatte'],['trattative','Leasing / trattative']];
+const DKEYS=[['ricerche','Ricerche fatte'],['prezzi','Prezzi validi'],['validaz','Validazione auto'],['proposte','Proposte fatte'],['trattative','Leasing / trattative']];
 const emptyL=()=>({contattati:0,risposti:0,interessati:0,validi:0,ricerche:0,proposte:0,trattative:0,permNo:0,permOk:0,permKo:0,rem:0,post:0,risentire:0,min:0});
-const emptyD=()=>({ricerche:0,prezzi:0,proposte:0,trattative:0,min:0});
+const emptyD=()=>({ricerche:0,prezzi:0,validaz:0,proposte:0,trattative:0,min:0});
 const DEF_SET={pctOnline:18,pctDiretta:15,goal:0,goalChiusure:0,sabato:false,callsDay:0,searchDay:0};
 
 /* ---------- archivio dati ---------- */
@@ -752,7 +753,7 @@ let rsz;window.addEventListener('resize',()=>{clearTimeout(rsz);rsz=setTimeout((
 
 /* ---------- storico ---------- */
 const LCOLS=[['contattati','Contattati'],['risposti','Risposte'],['interessati','Interessati'],['validi','Validi'],['permOk','Permute ok'],['ricerche','Ricerche'],['proposte','Proposte'],['trattative','Trattative']];
-const DCOLS=[['ricerche','Ricerche'],['prezzi','Prezzi validi'],['proposte','Proposte'],['trattative','Trattative']];
+const DCOLS=[['ricerche','Ricerche'],['prezzi','Prezzi validi'],['validaz','Validazione'],['proposte','Proposte'],['trattative','Trattative']];
 function histTable(kind,st){
   const isL=kind==='L', cols=isL?LCOLS:DCOLS, ch=isL?'online':'diretta';
   const sales=d=>st.sales.filter(s=>s.date===d&&s.channel===ch).length;
@@ -960,7 +961,7 @@ function leadCounts(items){const c={contattati:0,risposti:0,interessati:0,validi
   items.forEach(i=>{c.contattati++;if(i.risposto)c.risposti++;if(i.interessato)c.interessati++;if(i.esito==='valido')c.validi++;if(i.esito==='remarketing')c.rem++;if(i.esito==='posticipato')c.post++;
     if(i.permuta==='nessuna')c.permNo++;if(i.permuta==='valida')c.permOk++;if(i.permuta==='non_valida')c.permKo++;
     if(i.ricerca==='confermata')c.ricerche++;if(i.ricerca==='risentire')c.risentire++});return c}
-function dirCounts(items){const c={ricerche:0,prezzi:0,proposte:0};items.forEach(i=>{c.ricerche++;if(i.prezzo==='valido')c.prezzi++;if(i.esito==='proposta')c.proposte++});return c}
+function dirCounts(items){const c={ricerche:0,prezzi:0,validaz:0,proposte:0};items.forEach(i=>{c.ricerche++;if(i.prezzo==='valido')c.prezzi++;if(i.esito==='validazione')c.validaz++;if(i.esito==='proposta')c.proposte++});return c}
 const ESITO={valido:'Valido',non_valido:'Non valido',remarketing:'Remarketing',posticipato:'Posticipato'};
 function callTrail(c){const t=[];
   if(c.risposto===false)t.push(['Non risposto','ko']);
@@ -974,7 +975,7 @@ const chips=t=>'<div class="trail">'+t.map(([x,k])=>'<span class="chip '+k+'">'+
 function crmText(c,n,date){const t=callTrail(c).map(x=>x[0]).join(' · ');
   return 'Lead: '+(c.name||'Chiamata '+n)+'\nData: '+dmy(date||(SS?SS.date:today()))+(c.t?' '+hhmm(c.t):'')+'\nEsito: '+t+(c.esito==='posticipato'&&c.quando?'\nRichiamare: '+c.quando:'')+(c.note?'\nNote: '+c.note:'')}
 function dirTrail(s){const t=[['Ricerca eseguita','on']];if(s.prezzo==='valido')t.push(['Prezzo valido','ok']);if(s.prezzo==='non_valido')t.push(['Non valida','ko']);
-  if(s.esito==='proposta')t.push(['Proposta fatta','ok']);if(s.esito==='auto_non_valida')t.push(['Auto non valida','ko']);return t}
+  if(s.esito==='proposta')t.push(['Proposta fatta','ok']);if(s.esito==='validazione')t.push(['Validazione auto','on']);if(s.esito==='auto_non_valida')t.push(['Auto non valida','ko']);return t}
 
 function renderSession(){
   const el=$('.sess');if(!el||!SS)return;
@@ -985,12 +986,12 @@ function renderSession(){
   if(SS.phase==='summary'){h+=sessionSummary(SS,true)+'</div>';el.innerHTML=h;bindSession();return}
   h+='<div class="sess-body"><div style="display:flex;flex-direction:column;gap:14px;min-width:0">';
   h+=lead?'<div class="cnt num"><div><b>'+c.contattati+'</b><span>Chiamate</span></div><div><b>'+c.risposti+'</b><span>Risposte</span></div><div><b>'+c.interessati+'</b><span>Interessati</span></div><div><b>'+c.validi+'</b><span>Validi</span></div><div><b>'+c.ricerche+'</b><span>Ricerche</span></div></div>'
-         :'<div class="cnt three num"><div><b>'+c.ricerche+'</b><span>Ricerche</span></div><div><b>'+c.prezzi+'</b><span>Prezzi validi</span></div><div><b>'+c.proposte+'</b><span>Proposte</span></div></div>';
+         :'<div class="cnt four num"><div><b>'+c.ricerche+'</b><span>Ricerche</span></div><div><b>'+c.prezzi+'</b><span>Prezzi validi</span></div><div><b>'+c.validaz+'</b><span>Validazione</span></div><div><b>'+c.proposte+'</b><span>Proposte</span></div></div>';
   h+=lead?callCard():searchCard();
   h+='</div><aside class="log"><h3>'+(lead?'Chiamate della sessione':'Ricerche della sessione')+'</h3>';
   if(!SS.items.length)h+='<div class="empty" style="margin-top:8px">'+(lead?'Qui compaiono le chiamate concluse, con esito e note.':'Qui compaiono le ricerche concluse.')+'</div>';
   else h+=SS.items.map((it,i)=>({it,i})).reverse().map(({it,i})=>'<div class="li"><div class="li-h"><b>'+(lead?esc(it.name||'Chiamata '+(i+1)):esc(it.auto||'Ricerca '+(i+1)))+'</b><small>'+hhmm(it.t)+'</small></div>'
-    +chips(lead?callTrail(it):dirTrail(it))+(lead&&it.quando?'<p><b>Richiamare:</b> '+esc(it.quando)+'</p>':'')+(it.note?'<p>'+esc(it.note)+'</p>':'')
+    +chips(lead?callTrail(it):dirTrail(it))+(it.quando?'<p><b>'+(lead?'Richiamare':'Il fornitore richiama')+':</b> '+esc(it.quando)+'</p>':'')+(it.note?'<p>'+esc(it.note)+'</p>':'')
     +'<div class="acts" style="justify-content:flex-start">'+(lead&&it.risposto?'<button class="lnk" data-copy="'+i+'">Copia per CRM</button>':'')+'<button class="lnk ko" data-rmitem="'+i+'">Elimina</button></div></div>').join('');
   h+='</aside></div></div>';
   el.innerHTML=h;bindSession();
@@ -1036,7 +1037,9 @@ function searchCard(){
   } else if(c.step==='exec'){
     h+=chips(dirTrail(c))+'<div class="q">Il prezzo è valido?</div><div class="btns"><button class="btn ok big" data-a="pv">Prezzo valido</button><button class="btn ko big" data-a="pnv">Non valida<small>torna alla ricerca</small></button></div>';
   } else if(c.step==='price'){
-    h+=chips(dirTrail(c))+'<div class="q">Fai la proposta?</div><div class="btns"><button class="btn ok big" data-a="prop">Proposta fatta</button><button class="btn ko big" data-a="anv">Auto non valida</button></div>';
+    h+=chips(dirTrail(c))+'<div class="q">Fai la proposta?</div><div class="btns"><button class="btn ok big" data-a="prop">Proposta fatta</button><button class="btn ko big" data-a="anv">Auto non valida</button></div>'
+      +'<div class="f"><label for="s-when">Il fornitore deve richiamare? <span style="font-weight:400;color:var(--muted)">(facoltativo)</span></label><input type="text" id="s-when" placeholder="Es. oggi pomeriggio, domani mattina" value="'+esc(c.quando)+'" autocomplete="off"></div>'
+      +'<button class="btn dark big" data-a="valaz">Validazione auto<small>trovata, il fornitore richiama più avanti</small></button>';
   }
   if(c.step!=='start')h+='<button class="back" data-a="back">Indietro</button>';
   return h+'</div>';
@@ -1067,7 +1070,7 @@ function act(a){
   const c=SS.cur;
   const finishCall=()=>{c.t=c.t||Date.now();const item={name:(c.name||'').trim(),risposto:c.risposto,interessato:c.interessato??null,esito:c.esito||null,quando:c.quando||'',permuta:c.permuta||null,ricerca:c.ricerca||null,note:(c.note||'').trim(),t:c.t};
     if(c.idx!=null)SS.items[c.idx]=item;else{SS.items.push(item);c.idx=SS.items.length-1}};
-  const finishSearch=()=>{SS.items.push({auto:(c.auto||'').trim(),prezzo:c.prezzo||null,esito:c.esito||null,t:Date.now()});SS.cur=newSearch()};
+  const finishSearch=()=>{SS.items.push({auto:(c.auto||'').trim(),prezzo:c.prezzo||null,esito:c.esito||null,quando:(c.quando||'').trim(),t:Date.now()});SS.cur=newSearch()};
   if(SS.type==='lead'){
     const nt=$('#c-note');if(nt)c.note=nt.value;
     switch(a){
@@ -1101,6 +1104,7 @@ function act(a){
       case 'pv':c.prezzo='valido';c.step='price';break;
       case 'pnv':c.prezzo='non_valido';finishSearch();toast('Ricerca registrata: prezzo non valido.');break;
       case 'prop':c.esito='proposta';finishSearch();toast('Proposta registrata.');break;
+      case 'valaz':{const q=$('#s-when');c.quando=q?q.value:'';c.esito='validazione';finishSearch();toast('Ricerca registrata: validazione auto.');break}
       case 'anv':c.esito='auto_non_valida';finishSearch();toast('Ricerca registrata: auto non valida.');break;
       case 'back':if(c.step==='price'){c.step='exec';delete c.prezzo}else if(c.step==='exec')c.step='start';break;
     }
@@ -1113,7 +1117,7 @@ function endSession(){
   if(SS.type==='lead'&&c.step!=='start'&&c.step!=='done'&&c.idx==null){ // chiamata lasciata a metà: la registro con gli esiti scelti
     SS.items.push({name:(c.name||'').trim(),risposto:c.risposto,interessato:c.interessato??null,esito:c.esito||null,quando:c.quando||'',permuta:c.permuta||null,ricerca:c.ricerca||null,note:(c.note||'').trim(),t:c.t||Date.now()});
   }
-  if(SS.type==='dir'&&c.step!=='start')SS.items.push({auto:(c.auto||'').trim(),prezzo:c.prezzo||null,esito:c.esito||null,t:Date.now()});
+  if(SS.type==='dir'&&c.step!=='start')SS.items.push({auto:(c.auto||'').trim(),prezzo:c.prezzo||null,esito:c.esito||null,quando:(c.quando||'').trim(),t:Date.now()});
   SS.cur=SS.type==='lead'?newCall():newSearch();
   SS.wasRunning=!!SS.runFrom; if(SS.runFrom){SS.acc+=Date.now()-SS.runFrom;SS.runFrom=null}
   SS.phase='summary';saveDraft();renderSession();$('.sess').scrollTo(0,0);
@@ -1129,7 +1133,7 @@ function sessionSummary(s,live){
      +'<div><dt>Permute</dt><dd>Nessuna '+c.permNo+' · Valide '+c.permOk+' · Non valide '+c.permKo+'</dd></div><div><dt>Ricerche confermate</dt><dd>'+c.ricerche+'</dd></div><div><dt>Altri esiti</dt><dd>Remarketing '+c.rem+' · Posticipati '+c.post+' · Da risentire '+c.risentire+'</dd></div>'
      +(c.contattati&&ms>60000?'<div><dt>Ritmo</dt><dd>'+(c.contattati/(ms/3600000)).toFixed(1).replace('.',',')+' chiamate all\'ora</dd></div>':'');
   } else {
-    h+=(c.ricerche&&ms>60000?'<div><dt>Ritmo</dt><dd>'+(c.ricerche/(ms/3600000)).toFixed(1).replace('.',',')+' ricerche all\'ora</dd></div>':'')+'<div><dt>Ricerche fatte</dt><dd>'+c.ricerche+'</dd></div><div><dt>Prezzi validi</dt><dd>'+c.prezzi+' ('+pct(c.prezzi,c.ricerche)+')</dd></div><div><dt>Proposte fatte</dt><dd>'+c.proposte+'</dd></div>';
+    h+=(c.ricerche&&ms>60000?'<div><dt>Ritmo</dt><dd>'+(c.ricerche/(ms/3600000)).toFixed(1).replace('.',',')+' ricerche all\'ora</dd></div>':'')+'<div><dt>Ricerche fatte</dt><dd>'+c.ricerche+'</dd></div><div><dt>Prezzi validi</dt><dd>'+c.prezzi+' ('+pct(c.prezzi,c.ricerche)+')</dd></div><div><dt>Validazione auto</dt><dd>'+c.validaz+'</dd></div><div><dt>Proposte fatte</dt><dd>'+c.proposte+'</dd></div>';
   }
   h+='</dl>';
   if(live)h+='<p style="margin:0;font-size:13.5px;color:var(--muted)">Salvando, questi numeri e il tempo della sessione vengono aggiunti al '+dmy(s.date)+'. '+(lead?'Proposte, leasing / trattative e chiusure le inserisci nell\'aggiornamento di fine giornata.':'Leasing / trattative e chiusure le inserisci nell\'aggiornamento di fine giornata.')+'</p>'
@@ -1145,7 +1149,7 @@ function sessionSummary(s,live){
     const nr=s.items.length-ans.length; if(nr)h+='<p style="margin:10px 0 0;font-size:13px;color:var(--muted)">'+nr+' '+pl(nr,'chiamata senza risposta','chiamate senza risposta')+'.</p>';
     h+='</div>';
   } else if(s.items.length){
-    h+='<div class="log"><h3>Ricerche</h3>'+s.items.map((it,i)=>'<div class="li"><div class="li-h"><b>'+esc(it.auto||'Ricerca '+(i+1))+'</b><small>'+hhmm(it.t)+'</small></div>'+chips(dirTrail(it))+'</div>').join('')+'</div>';
+    h+='<div class="log"><h3>Ricerche</h3>'+s.items.map((it,i)=>'<div class="li"><div class="li-h"><b>'+esc(it.auto||'Ricerca '+(i+1))+'</b><small>'+hhmm(it.t)+'</small></div>'+chips(dirTrail(it))+(it.quando?'<p><b>Il fornitore richiama:</b> '+esc(it.quando)+'</p>':'')+'</div>').join('')+'</div>';
   }
   return h+'</div>';
 }
