@@ -370,7 +370,7 @@ const uid=p=>p+Date.now().toString(36)+Math.random().toString(36).slice(2,6);
 const lsGet=k=>{try{const v=localStorage.getItem(k);return v?JSON.parse(v):null}catch(e){return null}};
 const lsSet=(k,v)=>{try{if(v==null)localStorage.removeItem(k);else localStorage.setItem(k,JSON.stringify(v))}catch(e){}};
 
-const LKEYS=[['contattati','Leads contattati'],['risposti','Risposte'],['interessati','Interessati'],['validi','Validi'],['ricerche','Ricerche fatte'],['proposte','Proposte fatte'],['trattative','Leasing / trattative']];
+const LKEYS=[['contattati','Chiamate fatte'],['risposti','Risposte'],['interessati','Interessati'],['validi','Validi'],['ricerche','Ricerche fatte'],['proposte','Proposte fatte'],['trattative','Leasing / trattative']];
 const LEXTRA=[['permNo','Senza permuta'],['permOk','Permute valide'],['permKo','Permute non valide'],['rem','Remarketing'],['post','Posticipati'],['daValidare','Da validare'],['risentire','Da risentire']];
 const DKEYS=[['ricerche','Ricerche fatte'],['prezzi','Prezzi validi'],['autoOk','Auto valide'],['validaz','Validazione auto'],['proposte','Proposte fatte'],['daFare','Proposte da fare'],['trattative','Leasing / trattative']];
 const RKEYS=[['ricerche','Ricerche fatte'],['prezzi','Prezzi validi'],['autoOk','Auto valide'],['validaz','Validazione auto'],['proposte','Proposte fatte'],['daFare','Proposte da fare']];
@@ -480,7 +480,7 @@ function insights(st){
   else{
     a=st.n?(st.n+' '+pl(st.n,'chiusura','chiusure')+' per '+chf(st.m)+' di margine: il tuo guadagno è '+chf(st.g)+'.')
       :'Nessuna chiusura registrata finora.';
-    if(st.L.contattati)a+=' Hai contattato '+st.L.contattati+' lead in '+st.active+' '+pl(st.active,'giorno','giorni')+' di lavoro (media '+Math.round(st.L.contattati/Math.max(st.active,1))+' al giorno), con '+st.L.ricerche+' '+pl(st.L.ricerche,'ricerca confermata','ricerche confermate')+'.';
+    if(st.L.contattati)a+=' Hai fatto '+st.L.contattati+' '+pl(st.L.contattati,'chiamata','chiamate')+' in '+st.active+' '+pl(st.active,'giorno','giorni')+' di lavoro (media '+Math.round(st.L.contattati/Math.max(st.active,1))+' al giorno), con '+st.L.ricerche+' '+pl(st.L.ricerche,'ricerca confermata','ricerche confermate')+'.';
     const tm=st.L.min+st.R.min+st.T.min, rm=st.R.min+st.T.min;
     if(tm)a+=' Tempo in sessione: '+hm(tm)+(st.L.min&&rm?' ('+hm(st.L.min)+' di chiamate e '+hm(rm)+' di ricerche)':'')+'.';
     if(st.R.ricerche)a+=' Ricerche personali: '+st.R.ricerche+', con '+st.R.proposte+' '+pl(st.R.proposte,'proposta','proposte')+'.';
@@ -598,7 +598,7 @@ function funnelHTML(rows,prevRows){
      +'<span class="bar"><i style="width:'+Math.min(100,r[1]/max*100)+'%"></i></span>'
      +(i?'<span class="r num">'+pct(r[1],rows[i-1][1])+' dal passaggio precedente'+(rows[i-1][1]>=5?ptDelta(rate,pr):'')+'</span>':'')+'</div>'}).join('')+'</div>';
 }
-const LROWS=st=>[['Leads contattati',st.L.contattati],['Risposte',st.L.risposti],['Interessati',st.L.interessati],['Validi',st.L.validi],['Ricerche fatte',st.L.ricerche],['Proposte fatte',st.L.proposte],['Leasing / trattative',st.L.trattative],['Chiusure',st.L.chiusure]];
+const LROWS=st=>[['Chiamate fatte',st.L.contattati],['Risposte',st.L.risposti],['Interessati',st.L.interessati],['Validi',st.L.validi],['Ricerche fatte',st.L.ricerche],['Proposte fatte',st.L.proposte],['Leasing / trattative',st.L.trattative],['Chiusure',st.L.chiusure]];
 const DROWS=st=>[['Ricerche fatte',st.D.ricerche],['Prezzi validi',st.D.prezzi],['Proposte fatte',st.D.proposte],['Leasing / trattative',st.D.trattative],['Chiusure',st.D.chiusure]];
 const RROWS=st=>[['Ricerche fatte',st.R.ricerche],['Prezzi validi',st.R.prezzi],['Auto valide',st.R.autoOk],['Proposte fatte',st.R.proposte]];
 const TROWS=st=>[['Ricerche fatte',st.T.ricerche],['Prezzi validi',st.T.prezzi],['Auto valide',st.T.autoOk],['Proposte fatte',st.T.proposte]];
@@ -769,7 +769,7 @@ function niceStep(v){const e=Math.pow(10,Math.floor(Math.log10(Math.max(v,1)))),
 let rsz;window.addEventListener('resize',()=>{clearTimeout(rsz);rsz=setTimeout(()=>{if(view==='dash'){drawChart();drawActivity()}},120)});
 
 /* ---------- storico ---------- */
-const LCOLS=[['contattati','Contattati'],['risposti','Risposte'],['interessati','Interessati'],['validi','Validi'],['permOk','Permute ok'],['ricerche','Ricerche'],['proposte','Proposte'],['trattative','Trattative']];
+const LCOLS=[['contattati','Chiamate'],['risposti','Risposte'],['interessati','Interessati'],['validi','Validi'],['permOk','Permute ok'],['ricerche','Ricerche'],['proposte','Proposte'],['trattative','Trattative']];
 const DCOLS=[['ricerche','Ricerche'],['prezzi','Prezzi validi'],['autoOk','Auto valide'],['validaz','Validazione'],['proposte','Proposte'],['daFare','Da fare'],['trattative','Trattative']];
 const RCOLS=[['ricerche','Ricerche'],['prezzi','Prezzi validi'],['autoOk','Auto valide'],['validaz','Validazione'],['proposte','Proposte'],['daFare','Da fare']];
 function histTable(kind,st){
