@@ -356,7 +356,7 @@ th:first-child,td:first-child{box-shadow:inset -1px 0 0 var(--line)}
 .board-top .btn{min-height:48px;padding:10px 18px}
 .hint{margin:-6px 0 0;font-size:13px;color:var(--muted)}
 .board{display:flex;gap:10px;overflow-x:auto;padding-bottom:12px;scroll-snap-type:x proximity;align-items:flex-start}
-.col{flex:0 0 220px;background:var(--surface);border-top:4px solid var(--c);display:flex;flex-direction:column;min-height:140px;scroll-snap-align:start;transition:box-shadow .12s}
+.col{flex:1 0 240px;background:var(--surface);border-top:4px solid var(--c);display:flex;flex-direction:column;min-height:140px;scroll-snap-align:start;transition:box-shadow .12s}
 .col header{display:flex;justify-content:space-between;gap:8px;align-items:baseline;padding:10px 12px 8px;border-bottom:1px solid var(--line)}
 .col header b{font-family:var(--f-head);font-weight:800;font-size:15px}
 .col header span{font-size:12px;color:var(--muted)}
@@ -414,10 +414,31 @@ select{background:var(--surface)}
 .negf input{margin-top:6px}
 
 @media (max-width:440px){.tab .long{display:none}.subnav button{padding:9px 9px;font-size:11px;letter-spacing:0}.subnav button span{margin-left:2px;padding:1px 4px;min-width:16px}}
-.col.narrow{flex-basis:150px}
+.col.narrow{flex:0 0 160px}
 .alert{position:relative;padding-right:46px}
 .alert .ax{position:absolute;top:6px;right:6px;width:36px;height:36px;border:0;background:transparent;color:var(--ko);font-size:24px;line-height:1}
 .alert .ax:hover{background:rgba(194,58,38,.12)}
+
+/* a filo schermo */
+.wrap{max-width:none}
+@media (min-width:900px){.wrap{padding-inline:24px}}
+.fab{right:16px}
+.negbar .lbl,.negbar>div{max-width:none}
+.board{min-height:calc(100vh - 300px)}
+.col{min-height:calc(100vh - 320px)}
+.kc{font-size:15px;padding:12px}
+.kc small.due{color:var(--ko);font-weight:700}
+.whenbox{display:flex;flex-direction:column;gap:10px;border-left:4px solid var(--orange);padding:12px 14px;background:var(--orange-soft)}
+.when select{min-height:48px}
+#rem-slot{position:fixed;left:12px;bottom:calc(12px + env(safe-area-inset-bottom,0px));z-index:95;display:flex;flex-direction:column-reverse;gap:8px;width:min(340px,calc(100vw - 104px))}
+.rem{position:relative;background:var(--surface);border:1px solid var(--line);border-left:5px solid #D9A21B;box-shadow:0 10px 30px rgba(0,0,0,.18);padding:12px 44px 12px 14px;display:flex;flex-direction:column;gap:3px;font-size:14px}
+.rem .eyebrow{color:#B88710;font-size:10px}
+.rem b{font-family:var(--f-head);font-size:17px}
+.rem span{color:var(--muted)}
+.rem .ra{display:flex;gap:14px;margin-top:6px}
+.rem .rx{position:absolute;top:6px;right:6px;width:34px;height:34px;border:0;background:transparent;font-size:22px;line-height:1;color:var(--muted)}
+.rem .rx:hover{color:var(--ink)}
+.rem.more-r{padding:10px 14px;font-weight:600}
 @media (prefers-reduced-motion:reduce){*{transition:none!important;animation:none!important}}
 </style>
 </head>
@@ -609,6 +630,7 @@ function engine(){
     if(st.lvl>=2)mark(c,'ric',e.date); if(st.lvl>=3)mark(c,'off',e.date); if(st.lvl===4)mark(c,'lea',e.date);
     c.maxLvl=Math.max(c.maxLvl,st.lvl);
     c.neg=st.neg?{stage:to,date:e.date,t:e.t,reason:info.reason||'',rnote:info.rnote||'',mid:info.mid||null}:null;
+    if(st.sys!=='post'){c.remind=null;c.remindLbl=''}else if(info.remind!==undefined){c.remind=info.remind||null;c.remindLbl=info.quando||''}
     c.closure=st.lvl===5&&!st.neg?{date:e.date,t:e.t,auto:info.auto||'',margine:+info.margine||0,mid:info.mid||null}:null;
   };
   ev.forEach(e=>{
@@ -620,10 +642,11 @@ function engine(){
       calls[e.date]=(calls[e.date]||0)+1;if(it.risposto)ans[e.date]=(ans[e.date]||0)+1;
       if(it.risposto)mark(c,'risp',e.date); if(it.interessato)mark(c,'int',e.date);
       const to=callTarget(it,c.stage);
-      if(to)setStage(c,to,e,{by:'chiamata',reason:it.reason,rnote:it.rnote,sid:e.call.sid,i:e.call.i});
+      if(to)setStage(c,to,e,{by:'chiamata',reason:it.reason,rnote:it.rnote,sid:e.call.sid,i:e.call.i,remind:it.esito==='posticipato'?(it.remind||null):undefined,quando:it.quando});
+      else if(it.esito==='posticipato'&&(stageOf('lead',c.stage)||{}).sys==='post'){c.remind=it.remind||null;c.remindLbl=it.quando||''}
       else if(!c.stage){const x=sysStage('lead','post');if(x)setStage(c,x.id,e,{by:'chiamata'})}
       return}
-    if(e.move){const c=cards[e.kind+'|'+e.key];if(!c)return;setStage(c,e.move.to,e,{by:'manuale',reason:e.move.reason,rnote:e.move.rnote,auto:e.move.auto,margine:e.move.margine,mid:e.move.mid})}
+    if(e.move){const c=cards[e.kind+'|'+e.key];if(!c)return;setStage(c,e.move.to,e,{by:'manuale',reason:e.move.reason,rnote:e.move.rnote,auto:e.move.auto,margine:e.move.margine,mid:e.move.mid,remind:e.move.remind,quando:e.move.quando})}
   });
   Object.entries(S.cards).forEach(([id,m])=>{if(m.kind!=='lead')return;const c=cards['lead|'+m.key];if(!c)return;if(m.name)c.name=m.name;if(m.note!=null)c.note=m.note;c.metaId=id});
   Object.values(cards).forEach(c=>{if(!c.name)c.name=c.kind==='lead'?'Lead senza nome':'Contatto senza nome'});
@@ -699,6 +722,18 @@ function projection(st){
   return {g:st.g/el*tot,m:st.m/el*tot,n:st.n/el*tot,el,tot,rem:tot-el,pace:st.g/el};
 }
 
+/* ---------- data e ora del richiamo (fasce da 15 minuti) ---------- */
+const whenLabel=ts=>{const d=new Date(ts);return cap(dayShort(isoOf(d)))+' alle '+hhmm(ts)};
+function whenPicker(px,ts){
+  let d;if(ts)d=new Date(ts);else{d=new Date();d.setDate(d.getDate()+1);d.setHours(10,0,0,0)}
+  const cur=pad(d.getHours())+':'+pad(Math.floor(d.getMinutes()/15)*15);let opts='';
+  for(let h=7;h<=21;h++)for(let m=0;m<60;m+=15){const v=pad(h)+':'+pad(m);opts+='<option value="'+v+'"'+(v===cur?' selected':'')+'>'+v+'</option>'}
+  return '<div class="stps when"><div class="f"><label for="'+px+'-d">Giorno</label><input type="date" id="'+px+'-d" value="'+isoOf(d)+'" min="'+today()+'"></div>'
+    +'<div class="f"><label for="'+px+'-h">Ora</label><select id="'+px+'-h">'+opts+'</select></div></div>';
+}
+function readWhen(root,px){const dv=root.querySelector('#'+px+'-d'),hv=root.querySelector('#'+px+'-h');if(!dv||!dv.value)return null;
+  const [H,M]=hv.value.split(':').map(Number),d=new Date(dv.value+'T00:00');d.setHours(H,M,0,0);return {ts:d.getTime(),label:whenLabel(d.getTime())}}
+
 /* ---------- tema ---------- */
 const THK='ekk-kpi-theme', origTheme=document.documentElement.getAttribute('data-theme');
 const themePref=()=>{const t=lsGet(THK);return t==='light'||t==='dark'?t:'auto'};
@@ -738,6 +773,7 @@ function renderView(){
   if(sub==='dash'){drawChart();drawActivity(view)}
   if(sub==='pipe'){const b=$('#board');if(b)b.scrollLeft=boardScroll;bindBoard(view)}
   if(view==='time')drawTime();
+  renderReminders();
 }
 
 /* ---------- confronti ---------- */
@@ -1031,7 +1067,7 @@ function renderBoard(kind){
     if(q)list=list.filter(c=>normName(c.name).includes(q));
     let more=0;if(s.lvl===5){const old=list.filter(c=>c.closure&&daysBetween(c.closure.date,today())>45);more=old.length;list=list.filter(c=>!old.includes(c))}
     h+='<section class="col'+(/^x\d$/.test(s.sys||'')?' narrow':'')+'" data-drop="'+s.id+'" style="--c:'+s.color+'"><header><b>'+esc(s.name)+'</b><span class="num">'+all+'</span></header><div class="cards">'
-      +list.map(c=>'<button class="kc" data-card="'+esc(c.id)+'" style="--c:'+s.color+';background:'+tint(s.color)+'">'+esc(c.name)+(c.closure?'<small>'+chf(earn({margine:c.closure.margine,channel:kind==='lead'?'online':'diretta'}))+'</small>':'')+'</button>').join('')
+      +list.map(c=>'<button class="kc" data-card="'+esc(c.id)+'" style="--c:'+s.color+';background:'+tint(s.color)+'">'+esc(c.name)+(c.closure?'<small>'+chf(earn({margine:c.closure.margine,channel:kind==='lead'?'online':'diretta'}))+'</small>':'')+(c.remind?'<small class="'+(c.remind<=Date.now()?'due':'')+'">'+cap(dayShort(isoOf(new Date(c.remind)))).replace(/ \S+$/,'')+' '+hhmm(c.remind)+'</small>':'')+'</button>').join('')
       +(more?'<span class="more">+ '+more+' chiuse da più di 45 giorni</span>':'')+(!all?'<span class="drop-hint">Vuota</span>':'')+'</div></section>'});
   h+='</div>';
   const negs=stagesOf(kind).filter(s=>s.neg);
@@ -1074,6 +1110,7 @@ async function moveCard(c,to,opts){
     await put('moves',id,m);toast(c.name+' → '+s.name+(s.neg?': in Non conclusi.':'.'),()=>del('moves',id))};
   if(s.neg)return reasonSheet(c.kind,s,c.name,null,(reason,rnote)=>go({reason,rnote}),()=>renderView());
   if(s.lvl===5)return closureSheet(c,null,(auto,margine)=>go({auto,margine}),()=>renderView());
+  if(s.sys==='post')return whenSheet(c,(ts,quando)=>go({remind:ts,quando}),()=>renderView());
   go({});
 }
 function reasonSheet(kind,stage,name,cur,ok,cancel){
@@ -1168,6 +1205,35 @@ function renderNeg(kind){
   return h;
 }
 
+function whenSheet(c,ok,cancel){
+  sheet('<div class="sheet-h"><h2>Posticipato <span>'+esc(c.name)+'</span></h2><button class="x" data-close aria-label="Chiudi">×</button></div>'
+   +'<form id="ws-f" style="display:flex;flex-direction:column;gap:14px"><span class="lbl">Quando va ricontattato?</span>'+whenPicker('ws',c.remind)
+   +'<p class="h" style="margin:0;font-size:13px;color:var(--muted)">A quell\'ora ti compare un promemoria.</p>'
+   +'<div class="row-end"><button type="button" class="btn ghost" data-close>Annulla</button><button class="btn dark" type="submit">Conferma posticipo</button></div></form>',
+  ov=>{let done=false;ov.querySelector('#ws-f').onsubmit=e=>{e.preventDefault();const w=readWhen(ov,'ws');if(!w)return;if(w.ts<Date.now()-60000){toast('Scegli un giorno e un\'ora futuri.');return}done=true;closeSheet();ok(w.ts,w.label)};
+    sheet.onClose=()=>{if(!done&&cancel)cancel()}});
+}
+
+/* ---------- promemoria dei posticipati ---------- */
+const REMK='ekk-kpi-remind-off';
+function dueReminders(){const off=lsGet(REMK)||{},now=Date.now();
+  return cardsOf('lead').filter(c=>c.remind&&c.remind<=now&&!c.neg&&(stageOf('lead',c.stage)||{}).sys==='post'&&!off[c.key+'@'+c.remind]).sort((a,b)=>a.remind-b.remind)}
+function renderReminders(){
+  let box=document.getElementById('rem-slot');if(!box){box=document.createElement('div');box.id='rem-slot';box.setAttribute('aria-live','polite');document.body.appendChild(box)}
+  const list=dueReminders();
+  box.innerHTML=list.slice(0,4).map(c=>'<div class="rem" role="alert"><button class="rx" data-remoff="'+esc(c.key+'@'+c.remind)+'" aria-label="Elimina il promemoria">×</button>'
+    +'<span class="eyebrow">Da richiamare</span><b>'+esc(c.name)+'</b><span>Posticipato a '+esc(whenLabel(c.remind).toLowerCase())+'</span>'
+    +'<div class="ra"><button class="lnk" data-remcard="'+esc(c.id)+'">Apri scheda</button><button class="lnk" data-remcall="'+esc(c.id)+'">Chiama ora</button></div></div>').join('')
+    +(list.length>4?'<div class="rem more-r">+ altri '+(list.length-4)+' da richiamare</div>':'');
+  box.querySelectorAll('[data-remoff]').forEach(b=>b.onclick=()=>{const o=lsGet(REMK)||{};o[b.dataset.remoff]=1;lsSet(REMK,o);renderReminders()});
+  box.querySelectorAll('[data-remcard]').forEach(b=>b.onclick=()=>openCard(b.dataset.remcard));
+  box.querySelectorAll('[data-remcall]').forEach(b=>b.onclick=()=>{const c=engine().cards[b.dataset.remcall];if(!c)return;
+    const o=lsGet(REMK)||{};o[c.key+'@'+c.remind]=1;lsSet(REMK,o);renderReminders();
+    if(!SS){if(lsGet(DRAFT))resumeSession();else startSession()}
+    if(SS&&SS.phase==='work'&&SS.cur.step==='start'){SS.cur.name=c.name;SS.cur.lid=c.key.startsWith('u:')?c.key:null;saveDraft();renderSession()}});
+}
+setInterval(renderReminders,30000);
+
 /* ---------- storico lead ---------- */
 const LCOLS=[['contattati','Chiamate'],['risposti','Risposte'],['interessati','Interessati'],['validi','Validi'],['ricerche','Ricerche'],['proposte','Offerte'],['trattative','Leasing']];
 const DCOLS=[['nuovi','Contatti'],['valid','Validi'],['ric','Ricerche'],['off','Offerte'],['lea','Leasing']];
@@ -1186,7 +1252,6 @@ function dayTable(kind,st){
 function renderHistL(){
   const st=stats(ym);
   let h='<div class="hist-top"><h1>Storico lead di '+monthName(ym)+'</h1></div>';
-  h+=registroHTML();
   h+='<section class="card sec-l"><div class="card-h"><h2>Giorno per giorno</h2><span class="note">'+st.L.chiusure+' '+pl(st.L.chiusure,'chiusura','chiusure')+' · '+chf(st.gL)+' per te</span></div>'+dayTable('lead',st)+'</section>';
   const ses=Object.entries(S.sessions).map(([id,s])=>({id,...s})).filter(s=>s.type==='lead'&&s.date&&ymOf(s.date)===ym).sort((a,b)=>b.startedAt-a.startedAt);
   h+='<section class="card"><div class="card-h"><h2>Sessioni di chiamate</h2><span class="note">Orari modificabili</span></div>'
@@ -1195,6 +1260,7 @@ function renderHistL(){
      :'<div class="empty">Nessuna sessione in '+monthName(ym)+'.</div>')+'</section>';
   const sl=st.sales.filter(s=>s.kind==='lead');
   h+='<section class="card"><div class="card-h"><h2>Chiusure lead</h2><span class="note">'+chf(st.mL)+' di margine</span></div>'+(sl.length?sl.map(saleRow).join(''):'<div class="empty">Nessuna chiusura in '+monthName(ym)+'.</div>')+'</section>';
+  h+=registroHTML();
   return h;
 }
 function renderHistD(){
@@ -1282,10 +1348,10 @@ function editItem(it,{date,save,remove}){
     const ns=negSysOf(o);
     if(ns){const st=sysStage('lead',ns);h+='<div class="f negf"><span class="lbl">Motivo ('+esc(st?st.name:'')+')</span><div class="chs">'+reasonsOf('lead',ns).concat(['Altro']).map(r=>'<button type="button" class="ch" data-k="reason" data-v="'+esc(JSON.stringify(r))+'" aria-pressed="'+(o.reason===r)+'">'+esc(r)+'</button>').join('')+'</div>'
       +'<input type="text" id="ie-rnote" value="'+esc(o.rnote||'')+'" placeholder="Dettagli sul motivo (facoltativo)" autocomplete="off"></div>'}
-    h+='<div class="f"><label for="ie-when">Quando richiamare <span class="opt">(facoltativo)</span></label><input type="text" id="ie-when" value="'+esc(o.quando||'')+'" placeholder="Es. lunedì alle 10" autocomplete="off"></div>'
+    h+=(o.esito==='posticipato'?'<div class="whenbox"><span class="lbl">Quando richiamare</span>'+whenPicker('ie-w',o.remind)+'</div>':'<div class="f"><label for="ie-when">Quando richiamare <span class="opt">(facoltativo)</span></label><input type="text" id="ie-when" value="'+esc(o.quando||'')+'" placeholder="Es. lunedì alle 10" autocomplete="off"></div>')
       +'<div class="f"><label for="ie-note">Note</label><textarea id="ie-note" placeholder="Nessuna nota">'+esc(o.note||'')+'</textarea></div>';
     return h};
-  const read=ov=>{const g=x=>ov.querySelector(x);o.name=tidy(g('#ie-name').value);o.quando=g('#ie-when').value.trim();o.note=g('#ie-note').value.trim();
+  const read=ov=>{const g=x=>ov.querySelector(x);o.name=tidy(g('#ie-name').value);if(g('#ie-when'))o.quando=g('#ie-when').value.trim();const w=readWhen(ov,'ie-w');if(w){o.remind=w.ts;o.quando=w.label}else if(o.esito!=='posticipato')o.remind=null;o.note=g('#ie-note').value.trim();
     const r=g('#ie-rnote');if(r)o.rnote=r.value.trim();
     const tv=g('#ie-time').value;if(tv&&date){const [H,M]=tv.split(':').map(Number),d=new Date(date+'T00:00');d.setHours(H,M,0,0);o.t=d.getTime()}};
   sheet('<div class="sheet-h"><h2>Chiamata <span>'+(date?dmy(date):'')+'</span></h2><button class="x" data-close aria-label="Chiudi">×</button></div>'
@@ -1664,7 +1730,7 @@ function renderSession(){
   h+='</aside></div></div>';
   el.innerHTML=h;bindSession();
 }
-const WHEN_F=c=>'<div class="f"><label for="c-when">Quando va ricontattato?</label><input type="text" id="c-when" placeholder="Es. lunedì alle 10, dopo il 15 ottobre" value="'+esc(c.quando)+'"></div><div class="row-end"><button class="btn dark" data-a="postok">Conferma posticipo</button></div>';
+const WHEN_F=c=>'<div class="whenbox"><span class="lbl">Quando va ricontattato?</span>'+whenPicker('c-when',c.remind)+'<div class="row-end"><button class="btn dark" data-a="postok">Conferma posticipo</button></div></div>';
 const NOTE_F=(c,hint)=>'<div class="f"><label for="c-note">Note della chiamata</label><textarea id="c-note" placeholder="Auto cercata, budget, tempi, permuta, leasing o contanti…">'+esc(c.note)+'</textarea>'+(hint?'<span class="h">Le trovi nel resoconto, pronte da copiare nel CRM.</span>':'')+'</div>';
 function callCard(){
   const c=SS.cur,n=c.idx!=null?c.idx+1:SS.items.length+1;
@@ -1723,7 +1789,7 @@ function bindSession(){
   bindMatch();
   const nm=el.querySelector('#c-name');if(nm)nm.oninput=()=>{SS.cur.name=nm.value;if(SS.cur.lid&&!SS.cur.lid.startsWith('u:'))SS.cur.lid=null;saveDraft();$('#c-match').innerHTML=matchHTML(SS.cur);bindMatch()};
   const nt=el.querySelector('#c-note');if(nt)nt.oninput=()=>{SS.cur.note=nt.value;if(SS.cur.step==='done'&&SS.cur.idx!=null)SS.items[SS.cur.idx].note=nt.value;saveDraft()};
-  const wh=el.querySelector('#c-when');if(wh){wh.oninput=()=>{SS.cur.quando=wh.value;saveDraft()};wh.focus()}
+  const wd=el.querySelector('#c-when-d');if(wd)wd.scrollIntoView({block:'nearest'});
   el.querySelectorAll('[data-copy]').forEach(b=>b.onclick=()=>copy(crmText(SS.items[+b.dataset.copy],+b.dataset.copy+1)));
   el.querySelectorAll('[data-edit]').forEach(b=>b.onclick=()=>editSessionItem(+b.dataset.edit));
   const sv=el.querySelector('#ss-save');if(sv)sv.onclick=saveSession;
@@ -1736,7 +1802,7 @@ function bindSession(){
   el.querySelectorAll('[data-note]').forEach(t=>t.oninput=()=>{SS.items[+t.dataset.note].note=t.value;saveDraft()});
   el.querySelectorAll('[data-edit2]').forEach(b=>b.onclick=()=>editSessionItem(+b.dataset.edit2));
 }
-const callItem=c=>({name:tidy(c.name),lid:c.lid||null,risposto:c.risposto,interessato:c.interessato??null,esito:c.esito||null,quando:(c.quando||'').trim(),permuta:c.permuta||null,ricerca:c.ricerca||null,reason:c.reason||'',rnote:c.rnote||'',note:(c.note||'').trim(),t:c.t||Date.now()});
+const callItem=c=>({remind:c.remind||null,name:tidy(c.name),lid:c.lid||null,risposto:c.risposto,interessato:c.interessato??null,esito:c.esito||null,quando:(c.quando||'').trim(),permuta:c.permuta||null,ricerca:c.ricerca||null,reason:c.reason||'',rnote:c.rnote||'',note:(c.note||'').trim(),t:c.t||Date.now()});
 function askReason(c,sys,then){const st=sysStage('lead',sys);if(!st){then();return}
   reasonSheet('lead',st,c.name,null,(reason,rnote)=>{c.reason=reason;c.rnote=rnote;then();saveDraft();renderSession()})}
 function act(a){
@@ -1761,7 +1827,7 @@ function act(a){
     case 'nonvalido':askReason(c,'nonval',()=>{c.esito='non_valido';c.askWhen=false;c.step='done';finishCall()});return;
     case 'davalid':c.esito='da_validare';c.askWhen=false;c.step='done';finishCall();break;
     case 'post':c.askWhen=true;break;
-    case 'postok':{const w=$('#c-when');c.quando=(w?w.value:c.quando||'').trim();if(!c.quando){toast('Scrivi quando va ricontattato.');w&&w.focus();return}c.esito='posticipato';c.askWhen=false;c.step='done';finishCall();break}
+    case 'postok':{const w=readWhen($('.sess'),'c-when');if(!w){toast('Scegli il giorno del richiamo.');return}if(w.ts<Date.now()-60000){toast('Scegli un giorno e un\'ora futuri.');return}c.remind=w.ts;c.quando=w.label;c.esito='posticipato';c.askWhen=false;c.step='done';finishCall();break}
     case 'ric':c.ricerca='confermata';c.step='done';finishCall();break;
     case 'noric':c.ricerca='risentire';c.step='done';finishCall();break;
     case 'copy':copy(crmText(SS.items[c.idx],c.idx+1));return;
