@@ -642,8 +642,8 @@ function engine(){
       calls[e.date]=(calls[e.date]||0)+1;if(it.risposto)ans[e.date]=(ans[e.date]||0)+1;
       if(it.risposto)mark(c,'risp',e.date); if(it.interessato)mark(c,'int',e.date);
       const to=callTarget(it,c.stage);
-      if(to)setStage(c,to,e,{by:'chiamata',reason:it.reason,rnote:it.rnote,sid:e.call.sid,i:e.call.i,remind:it.esito==='posticipato'?(it.remind||null):undefined,quando:it.quando});
-      else if(it.esito==='posticipato'&&(stageOf('lead',c.stage)||{}).sys==='post'){c.remind=it.remind||null;c.remindLbl=it.quando||''}
+      if(to)setStage(c,to,e,{by:'chiamata',reason:it.reason,rnote:it.rnote,sid:e.call.sid,i:e.call.i,remind:(it.esito==='posticipato'||it.esito==='da_validare')?(it.remind||null):undefined,quando:it.quando});
+      else if((it.esito==='posticipato'||it.esito==='da_validare')&&(stageOf('lead',c.stage)||{}).sys==='post'){c.remind=it.remind||null;c.remindLbl=it.quando||''}
       else if(!c.stage){const x=sysStage('lead','post');if(x)setStage(c,x.id,e,{by:'chiamata'})}
       return}
     if(e.move){const c=cards[e.kind+'|'+e.key];if(!c)return;setStage(c,e.move.to,e,{by:'manuale',reason:e.move.reason,rnote:e.move.rnote,auto:e.move.auto,margine:e.move.margine,mid:e.move.mid,remind:e.move.remind,quando:e.move.quando})}
@@ -1348,10 +1348,10 @@ function editItem(it,{date,save,remove}){
     const ns=negSysOf(o);
     if(ns){const st=sysStage('lead',ns);h+='<div class="f negf"><span class="lbl">Motivo ('+esc(st?st.name:'')+')</span><div class="chs">'+reasonsOf('lead',ns).concat(['Altro']).map(r=>'<button type="button" class="ch" data-k="reason" data-v="'+esc(JSON.stringify(r))+'" aria-pressed="'+(o.reason===r)+'">'+esc(r)+'</button>').join('')+'</div>'
       +'<input type="text" id="ie-rnote" value="'+esc(o.rnote||'')+'" placeholder="Dettagli sul motivo (facoltativo)" autocomplete="off"></div>'}
-    h+=(o.esito==='posticipato'?'<div class="whenbox"><span class="lbl">Quando richiamare</span>'+whenPicker('ie-w',o.remind)+'</div>':'<div class="f"><label for="ie-when">Quando richiamare <span class="opt">(facoltativo)</span></label><input type="text" id="ie-when" value="'+esc(o.quando||'')+'" placeholder="Es. lunedì alle 10" autocomplete="off"></div>')
+    h+=(o.esito==='posticipato'||o.esito==='da_validare'?'<div class="whenbox"><span class="lbl">Quando richiamare</span>'+whenPicker('ie-w',o.remind)+'</div>':'<div class="f"><label for="ie-when">Quando richiamare <span class="opt">(facoltativo)</span></label><input type="text" id="ie-when" value="'+esc(o.quando||'')+'" placeholder="Es. lunedì alle 10" autocomplete="off"></div>')
       +'<div class="f"><label for="ie-note">Note</label><textarea id="ie-note" placeholder="Nessuna nota">'+esc(o.note||'')+'</textarea></div>';
     return h};
-  const read=ov=>{const g=x=>ov.querySelector(x);o.name=tidy(g('#ie-name').value);if(g('#ie-when'))o.quando=g('#ie-when').value.trim();const w=readWhen(ov,'ie-w');if(w){o.remind=w.ts;o.quando=w.label}else if(o.esito!=='posticipato')o.remind=null;o.note=g('#ie-note').value.trim();
+  const read=ov=>{const g=x=>ov.querySelector(x);o.name=tidy(g('#ie-name').value);if(g('#ie-when'))o.quando=g('#ie-when').value.trim();const w=readWhen(ov,'ie-w');if(w){o.remind=w.ts;o.quando=w.label}else if(o.esito!=='posticipato'&&o.esito!=='da_validare')o.remind=null;o.note=g('#ie-note').value.trim();
     const r=g('#ie-rnote');if(r)o.rnote=r.value.trim();
     const tv=g('#ie-time').value;if(tv&&date){const [H,M]=tv.split(':').map(Number),d=new Date(date+'T00:00');d.setHours(H,M,0,0);o.t=d.getTime()}};
   sheet('<div class="sheet-h"><h2>Chiamata <span>'+(date?dmy(date):'')+'</span></h2><button class="x" data-close aria-label="Chiudi">×</button></div>'
@@ -1745,11 +1745,11 @@ function callCard(){
       +'<div class="btns"><button class="btn ok big" data-a="risposto">Risposto</button><button class="btn ko big" data-a="nonrisposto">Non risposto</button></div>';
   } else if(c.step==='answered'){
     h+='<div class="q">Il lead è interessato?</div><div class="btns"><button class="btn ok big" data-a="int">Interessato</button><button class="btn ko big" data-a="noint">Non interessato</button></div>'
-      +'<button class="btn dark big" data-a="post">Posticipato<small>da ricontattare più avanti</small></button>'+(c.askWhen?WHEN_F(c):'');
+      +'<button class="btn dark big" data-a="post">Posticipato<small>scegli giorno e ora del richiamo</small></button>';
   } else if(c.step==='interested'){
     h+=NOTE_F(c,true)
       +'<div class="q">Il lead è valido?</div><div class="btns four"><button class="btn ok big" data-a="valido">Valido</button><button class="btn ko big" data-a="nonvalido">Non valido</button><button class="btn dark big" data-a="post">Posticipato</button><button class="btn ghost big" data-a="davalid">Da validare<small>da capire</small></button></div>'
-      +(c.askWhen?WHEN_F(c):'');
+      ;
   } else if(c.step==='perm'){
     h+=NOTE_F(c)
       +'<div class="q">Il cliente ha un\'auto da dare in permuta?</div><button class="btn dark big" data-a="permno">Nessuna permuta<small>il cliente non ha un\'auto da dare</small></button><div class="btns"><button class="btn ok big" data-a="permok">Permuta valida</button><button class="btn ko big" data-a="permko">Permuta non valida</button></div>'
@@ -1825,8 +1825,7 @@ function act(a){
     case 'permval':c.permuta='da_valutare';c.step='valid';break;
     case 'permko':askReason(c,'permko',()=>{c.permuta='non_valida';c.step='done';finishCall()});return;
     case 'nonvalido':askReason(c,'nonval',()=>{c.esito='non_valido';c.askWhen=false;c.step='done';finishCall()});return;
-    case 'davalid':c.esito='da_validare';c.askWhen=false;c.step='done';finishCall();break;
-    case 'post':c.askWhen=true;break;
+    case 'davalid':case 'post':whenSheet({name:c.name,remind:c.remind},(ts,q)=>{c.remind=ts;c.quando=q;c.esito=a==='post'?'posticipato':'da_validare';c.askWhen=false;c.step='done';finishCall();saveDraft();renderSession()});return;
     case 'postok':{const w=readWhen($('.sess'),'c-when');if(!w){toast('Scegli il giorno del richiamo.');return}if(w.ts<Date.now()-60000){toast('Scegli un giorno e un\'ora futuri.');return}c.remind=w.ts;c.quando=w.label;c.esito='posticipato';c.askWhen=false;c.step='done';finishCall();break}
     case 'ric':c.ricerca='confermata';c.step='done';finishCall();break;
     case 'noric':c.ricerca='risentire';c.step='done';finishCall();break;
