@@ -751,15 +751,15 @@ function projection(st){
   return {g:st.g/el*tot,m:st.m/el*tot,n:st.n/el*tot,el,tot,rem:tot-el,pace:st.g/el};
 }
 
-/* selettore del source: tendina con la voce "Nuovo source" (evita errori di battitura) */
+/* selettore del source: tendina con la voce "Nuova fonte" (evita errori di battitura) */
 const SRC_NEW='__new';
 function srcPickerHTML(px,val,lbl){const L=sourcesList(),v=tidy(val),isList=L.some(x=>sameSrc(x,v)),opts=L.slice();if(v&&!isList)opts.push(v);
-  return '<div class="f srcf" id="'+px+'-sbox"><label for="'+px+'-src">'+(lbl||'Da dove arriva il lead?')+'</label><select id="'+px+'-src"><option value="">Scegli il source…</option>'
-    +opts.map(s=>'<option value="'+esc(s)+'"'+(v&&sameSrc(s,v)?' selected':'')+'>'+esc(s)+(v&&!isList&&s===v?' (nuovo)':'')+'</option>').join('')+'<option value="'+SRC_NEW+'">+ Nuovo source…</option></select>'
-    +'<div class="newsrc" id="'+px+'-nb" hidden><input type="text" id="'+px+'-new" placeholder="Nome del nuovo source (es. Meta · Porsche)" autocomplete="off" aria-label="Nome del nuovo source"><span class="h" id="'+px+'-sh"></span></div></div>'}
+  return '<div class="f srcf" id="'+px+'-sbox"><label for="'+px+'-src">'+(lbl||'Da dove arriva il lead?')+'</label><select id="'+px+'-src"><option value="">Scegli la fonte…</option>'
+    +opts.map(s=>'<option value="'+esc(s)+'"'+(v&&sameSrc(s,v)?' selected':'')+'>'+esc(s)+(v&&!isList&&s===v?' (nuovo)':'')+'</option>').join('')+'<option value="'+SRC_NEW+'">+ Nuova fonte…</option></select>'
+    +'<div class="newsrc" id="'+px+'-nb" hidden><input type="text" id="'+px+'-new" placeholder="Nome della nuova fonte (es. Meta · Porsche)" autocomplete="off" aria-label="Nome della nuova fonte"><span class="h" id="'+px+'-sh"></span></div></div>'}
 function readSrc(root,px){const s=root.querySelector('#'+px+'-src');if(!s)return null;if(s.value===SRC_NEW)return canonSrc(root.querySelector('#'+px+'-new').value);return s.value}
 function bindSrcPicker(root,px,onChange){const s=root.querySelector('#'+px+'-src');if(!s)return;const nb=root.querySelector('#'+px+'-nb'),inp=root.querySelector('#'+px+'-new'),hint=root.querySelector('#'+px+'-sh');
-  const sync=()=>{if(s.value===SRC_NEW){const t=tidy(inp.value),c=canonSrc(t);hint.textContent=!t?'':(c!==t?'Esiste già «'+c+'»: uso quello.':'Nuovo source: lo aggiungo all\'elenco.')}onChange&&onChange(readSrc(root,px))};
+  const sync=()=>{if(s.value===SRC_NEW){const t=tidy(inp.value),c=canonSrc(t);hint.textContent=!t?'':(c!==t?'Esiste già «'+c+'»: uso quella.':'Nuova fonte: la aggiungo all\'elenco.')}onChange&&onChange(readSrc(root,px))};
   s.onchange=()=>{nb.hidden=s.value!==SRC_NEW;if(s.value===SRC_NEW)inp.focus();sync()};inp.oninput=sync}
 
 /* ---------- data e ora del richiamo (fasce da 15 minuti) ---------- */
@@ -1007,18 +1007,18 @@ function renderDash(kind){
   return h;
 }
 function srcDashBar(){const L=sourcesList(),cs=cardsOf('lead');if(srcD&&srcD!==SRC_NONE&&!L.some(x=>sameSrc(x,srcD)))srcD='';
-  return '<div class="srcbar"><label class="srcsel"><span>KPI per source</span><select id="src-d" aria-label="Mostra le KPI di un solo source"><option value="">Tutti i source</option>'+L.map(s=>'<option value="'+esc(s)+'"'+(sameSrc(s,srcD)?' selected':'')+'>'+esc(s)+'</option>').join('')
-    +(cs.some(c=>!c.src)?'<option value="'+SRC_NONE+'"'+(srcD===SRC_NONE?' selected':'')+'>Senza source</option>':'')+'</select></label>'
-    +(srcD?'<span class="note">Numeri, funnel, grafico e chiusure di <b>'+esc(srcD===SRC_NONE?'Senza source':srcD)+'</b>. Guadagno, obiettivo e avvisi restano generali.</span>':'<span class="note">Stai guardando tutti i lead insieme.</span>')+'</div>'}
+  return '<div class="srcbar"><label class="srcsel"><span>KPI per fonte</span><select id="src-d" aria-label="Mostra le KPI di una sola fonte"><option value="">Tutte le fonti</option>'+L.map(s=>'<option value="'+esc(s)+'"'+(sameSrc(s,srcD)?' selected':'')+'>'+esc(s)+'</option>').join('')
+    +(cs.some(c=>!c.src)?'<option value="'+SRC_NONE+'"'+(srcD===SRC_NONE?' selected':'')+'>Senza fonte</option>':'')+'</select></label>'
+    +(srcD?'<span class="note">Numeri, funnel, grafico e chiusure di <b>'+esc(srcD===SRC_NONE?'Senza fonte':srcD)+'</b>. Guadagno, obiettivo e avvisi restano generali.</span>':'<span class="note">Stai guardando tutti i lead insieme.</span>')+'</div>'}
 function srcDashHTML(){
   const rows=srcRows(ym), has=sourcesList().length;
-  let h='<section class="card"><div class="card-h"><h2>Per source</h2><span class="note">'+monthName(ym)+'</span></div>';
-  if(!rows.length||!has)return h+'<div class="empty">Quando indichi da dove arriva ogni lead nelle sessioni, qui vedi quale source porta più risposte, validi e chiusure.</div></section>';
+  let h='<section class="card"><div class="card-h"><h2>Per fonte</h2><span class="note">'+monthName(ym)+'</span></div>';
+  if(!rows.length||!has)return h+'<div class="empty">Quando indichi da dove arriva ogni lead nelle sessioni, qui vedi quale fonte porta più risposte, validi e chiusure.</div></section>';
   const T=rows.reduce((a,r)=>{for(const k in r)if(k!=='src')a[k]=(a[k]||0)+r[k];return a},{});
   const tr=(r,lbl,cls)=>'<tr'+(cls?' class="'+cls+'"':'')+'><td>'+lbl+'</td><td class="num">'+r.nuovi+'</td><td class="num">'+r.chiamate+'</td><td class="num">'+r.risp+'</td><td class="num">'+r.valid+'</td><td class="num">'+r.off+'</td><td class="num">'+r.chius+'</td><td class="num">'+(r.marg?chf(r.marg):'—')+'</td></tr>';
-  h+='<div class="tbl-wrap"><table class="negt srct"><thead><tr><th>Source</th><th>Lead nuovi</th><th>Chiamate</th><th>Risposte</th><th>Validi</th><th>Offerte</th><th>Chiusure</th><th>Margine</th></tr></thead><tbody>'
-    +rows.map(r=>tr(r,r.src?esc(r.src):'<i>Senza source</i>')).join('')+(rows.length>1?tr(T,'<b>Totale</b>','tot'):'')+'</tbody></table></div>'
-    +'<p class="h" style="margin:10px 0 0;font-size:13px;color:var(--muted)">Ogni lead conta per il suo source. Per cambiarlo apri la scheda dalla pipeline.</p></section>';
+  h+='<div class="tbl-wrap"><table class="negt srct"><thead><tr><th>Fonte</th><th>Lead nuovi</th><th>Chiamate</th><th>Risposte</th><th>Validi</th><th>Offerte</th><th>Chiusure</th><th>Margine</th></tr></thead><tbody>'
+    +rows.map(r=>tr(r,r.src?esc(r.src):'<i>Senza fonte</i>')).join('')+(rows.length>1?tr(T,'<b>Totale</b>','tot'):'')+'</tbody></table></div>'
+    +'<p class="h" style="margin:10px 0 0;font-size:13px;color:var(--muted)">Ogni lead conta per la sua fonte. Per cambiarlo apri la scheda dalla pipeline.</p></section>';
   return h}
 function saleRow(s){
   return '<div class="sale"><div><div class="a">'+esc(s.name||s.auto||'Chiusura')+'</div><div class="m">'+dmy(s.date)+(s.name&&s.auto?' · '+esc(s.auto):'')+' · <span class="chip '+(s.kind==='lead'?'on':'')+'">'+(s.kind==='lead'?'Lead':'Contatto diretto')+'</span>'+(s.legacy?' <span class="chip">Inserita a mano</span>':'')+'</div></div>'
@@ -1114,8 +1114,8 @@ let DRAG=null, pipeQ='', srcF=lsGet('ekk-kpi-srcf')||'';
 const srcPass=c=>srcMatch(c,srcF);
 function srcFilterHTML(kind){if(kind!=='lead')return '';const L=sourcesList(),cs=cardsOf('lead');if(srcF&&srcF!==SRC_NONE&&!L.some(x=>sameSrc(x,srcF)))srcF='';
   const n=f=>cs.filter(c=>srcMatch(c,f)).length;
-  return '<label class="srcsel"><span>Source</span><select id="src-f" aria-label="Filtra per source"><option value="">Tutti i source</option>'+L.map(s=>'<option value="'+esc(s)+'"'+(sameSrc(s,srcF)?' selected':'')+'>'+esc(s)+' ('+n(s)+')</option>').join('')
-    +(cs.some(c=>!c.src)?'<option value="'+SRC_NONE+'"'+(srcF===SRC_NONE?' selected':'')+'>Senza source ('+n(SRC_NONE)+')</option>':'')+'</select></label>'}
+  return '<label class="srcsel"><span>Fonte</span><select id="src-f" aria-label="Filtra per fonte"><option value="">Tutte le fonti</option>'+L.map(s=>'<option value="'+esc(s)+'"'+(sameSrc(s,srcF)?' selected':'')+'>'+esc(s)+' ('+n(s)+')</option>').join('')
+    +(cs.some(c=>!c.src)?'<option value="'+SRC_NONE+'"'+(srcF===SRC_NONE?' selected':'')+'>Senza fonte ('+n(SRC_NONE)+')</option>':'')+'</select></label>'}
 function bindSrcFilter(){const f=$('#src-f');if(f)f.onchange=()=>{srcF=f.value;lsSet('ekk-kpi-srcf',srcF||null);renderView()}}
 const tint=c=>'color-mix(in srgb,'+c+' 13%,var(--surface))';
 function boardCards(kind,stageId){
@@ -1231,7 +1231,7 @@ function openCard(id){
    +(c.neg?'<div class="warn">Non concluso: <b>'+esc(c.neg.reason||'motivo non indicato')+'</b>'+(c.neg.rnote?' · '+esc(c.neg.rnote):'')+(c.neg.mid?' <button type="button" class="lnk" id="cd-reason">Modifica motivo</button>':'')+'</div>':'')
    +(c.closure?'<div class="okbox">Chiusura del '+dmy(c.closure.date)+(c.closure.auto?' · '+esc(c.closure.auto):'')+' · margine '+chf(c.closure.margine)+(c.closure.mid?' <button type="button" class="lnk" id="cd-clos">Modifica</button>':'')+'</div>':'')
    +'<div class="f"><label for="cd-n">Nome</label><input type="text" id="cd-n" value="'+esc(c.name)+'" autocomplete="off"></div>'
-   +(K==='lead'?srcPickerHTML('cd',c.src,'Source'):'')
+   +(K==='lead'?srcPickerHTML('cd',c.src,'Fonte'):'')
    +'<div class="f"><label for="cd-note">Note</label><textarea id="cd-note" placeholder="Nessuna nota">'+esc(c.note||'')+'</textarea></div>'
    +'<div class="f"><label for="cd-st">Sposta in</label><select id="cd-st">'+opts+'</select></div>'
    +'<div class="row-end">'+(K==='dir'?'<button type="button" class="btn ghost ko-t" id="cd-del" style="margin-right:auto">Elimina scheda</button>':'')+'<button type="button" class="btn ghost" data-close>Chiudi</button><button class="btn" type="submit">Salva</button></div>'
@@ -1613,12 +1613,12 @@ function pipeEditorHTML(kind){
 function srcEditorHTML(){
   if(!SRD)SRD=sourcesList().map(s=>({old:s,name:s}));
   const cnt=s=>cardsOf('lead').filter(c=>sameSrc(c.src,s)).length;
-  return '<section class="card"><div class="card-h"><h2>Source dei lead</h2><span class="note">Campagne e canali da cui arrivano</span></div>'
-   +(SRD.length?SRD.map((r,i)=>'<div class="srcrow"><input type="text" value="'+esc(r.name)+'" data-si="'+i+'" aria-label="Nome del source" autocomplete="off">'
-      +'<small>'+(r.old?cnt(r.old)+' lead':'nuovo')+'</small><button type="button" class="x2" data-srm="'+i+'" aria-label="Elimina il source">×</button></div>').join('')
-      :'<div class="empty" style="margin-bottom:10px">Nessun source. Si aggiungono da soli quando li scrivi in sessione, oppure aggiungili qui.</div>')
-   +'<span class="h" style="display:block;margin:2px 0 4px;font-size:13px;color:var(--muted)">Se rinomini un source, cambia su tutti i suoi lead. Se due source prendono lo stesso nome si uniscono.</span>'
-   +'<div class="row-end" style="margin-top:12px"><button type="button" class="btn ghost" id="src-add">+ Aggiungi source</button><button type="button" class="btn" id="src-save">Salva source</button></div></section>';
+  return '<section class="card"><div class="card-h"><h2>Fonti dei lead</h2><span class="note">Campagne e canali da cui arrivano</span></div>'
+   +(SRD.length?SRD.map((r,i)=>'<div class="srcrow"><input type="text" value="'+esc(r.name)+'" data-si="'+i+'" aria-label="Nome della fonte" autocomplete="off">'
+      +'<small>'+(r.old?cnt(r.old)+' lead':'nuova')+'</small><span class="pbt"><button type="button" data-smv="-1" data-i="'+i+'" aria-label="Sposta su"'+(i===0?' disabled':'')+'>↑</button><button type="button" data-smv="1" data-i="'+i+'" aria-label="Sposta giù"'+(i===SRD.length-1?' disabled':'')+'>↓</button></span><button type="button" class="x2" data-srm="'+i+'" aria-label="Elimina la fonte">×</button></div>').join('')
+      :'<div class="empty" style="margin-bottom:10px">Nessuna fonte. Si aggiungono da sole quando le scrivi in sessione, oppure aggiungile qui.</div>')
+   +'<span class="h" style="display:block;margin:2px 0 4px;font-size:13px;color:var(--muted)">Se rinomini una fonte, cambia su tutti i suoi lead. Se due fonti prendono lo stesso nome si uniscono. Con le frecce scegli l\'ordine: è lo stesso che vedi nelle tendine.</span>'
+   +'<div class="row-end" style="margin-top:12px"><button type="button" class="btn ghost" id="src-add">+ Aggiungi fonte</button><button type="button" class="btn" id="src-save">Salva fonti</button></div></section>';
 }
 async function applySources(){
   const keep=[],map={};  // map: vecchio nome normalizzato -> nuovo nome ('' = tolto)
@@ -1630,7 +1630,7 @@ async function applySources(){
   for(const [id,m] of Object.entries(S.cards)){if(m.kind!=='lead'||!tidy(m.src)||ren(m.src)===tidy(m.src))continue;await put('cards',id,{...m,src:ren(m.src)})}
   await put('settings','main',{...S.settings,sources:keep});
   SRD=null;renderView();if(srcF&&!keep.some(x=>sameSrc(x,srcF))&&srcF!==SRC_NONE){srcF='';lsSet('ekk-kpi-srcf',null)}
-  toast('Source salvati.');
+  toast('Fonti salvate.');
 }
 function reasonsHTML(kind){
   const negs=stagesOf(kind).filter(s=>s.neg);
@@ -1677,11 +1677,12 @@ function bindSet(){
     m.querySelectorAll('[data-rk="'+k+'"]').forEach(t=>{r[t.dataset.rs]=t.value.split('\n').map(tidy).filter(x=>x&&x.toLowerCase()!=='altro')});
     await put('settings','main',{...S.settings,reasons:{...(S.settings.reasons||{}),[k]:r}});toast('Motivi salvati.')});
   m.querySelectorAll('[data-si]').forEach(i=>i.oninput=()=>{SRD[+i.dataset.si].name=i.value});
+  m.querySelectorAll('[data-smv]').forEach(b=>b.onclick=()=>{const i=+b.dataset.i,j=i+ +b.dataset.smv;if(j<0||j>=SRD.length)return;[SRD[i],SRD[j]]=[SRD[j],SRD[i]];renderView()});
   m.querySelectorAll('[data-srm]').forEach(b=>b.onclick=()=>{SRD.splice(+b.dataset.srm,1);renderView()});
   const sa=$('#src-add');if(sa)sa.onclick=()=>{SRD.push({old:'',name:''});renderView();const ins=$('#main').querySelectorAll('[data-si]');if(ins.length)ins[ins.length-1].focus()};
   const ss=$('#src-save');if(ss)ss.onclick=()=>{
     const cur=sourcesList(),gone=cur.filter(o=>!SRD.some(r=>r.old===o&&tidy(r.name))),n=gone.reduce((a,o)=>a+cardsOf('lead').filter(c=>sameSrc(c.src,o)).length,0);
-    if(n)confirmSheet('Togliere '+gone.length+' source?',n+' '+pl(n,'lead resta','lead restano')+' senza source: potrai assegnarne uno nuovo dalla scheda.','Togli e salva',applySources);else applySources()};
+    if(n)confirmSheet('Togliere '+gone.length+' fonti?',n+' '+pl(n,'lead resta','lead restano')+' senza fonte: potrai assegnarne una nuova dalla scheda.','Togli e salva',applySources);else applySources()};
   const sf=$('#set-form');
   if(sf)sf.onsubmit=e=>{e.preventDefault();const n=v=>Math.max(0,+v||0);
     put('settings','main',{...S.settings,pctOnline:n($('#s-on').value),pctDiretta:n($('#s-di').value),goal:n($('#s-goal').value),sabato:$('#s-sab').checked,callsDay:Math.round(n($('#s-calls').value))});toast('Impostazioni salvate.')};
@@ -1779,7 +1780,7 @@ function callTrail(c){const t=[];
   return t}
 const chips=t=>'<div class="trail">'+t.map(([x,k])=>'<span class="chip '+k+'">'+esc(x)+'</span>').join('')+'</div>';
 function crmText(c,n,date){const t=callTrail(c).map(x=>x[0]).join(' · ');
-  return 'Lead: '+(c.name||'Chiamata '+n)+(c.src?'\nSource: '+c.src:'')+'\nData: '+dmy(date||(SS?SS.date:today()))+(c.t?' '+hhmm(c.t):'')+'\nEsito: '+t+(c.reason?'\nMotivo: '+c.reason+(c.rnote?' ('+c.rnote+')':''):'')+(c.quando?'\nRichiamare: '+c.quando:'')+(c.note?'\nNote: '+c.note:'')}
+  return 'Lead: '+(c.name||'Chiamata '+n)+(c.src?'\nFonte: '+c.src:'')+'\nData: '+dmy(date||(SS?SS.date:today()))+(c.t?' '+hhmm(c.t):'')+'\nEsito: '+t+(c.reason?'\nMotivo: '+c.reason+(c.rnote?' ('+c.rnote+')':''):'')+(c.quando?'\nRichiamare: '+c.quando:'')+(c.note?'\nNote: '+c.note:'')}
 
 /* lead già chiamati e fase in cui si trovano adesso (anche con le chiamate della sessione in corso) */
 function liveStage(key,upto){
@@ -1832,7 +1833,7 @@ function renderSession(){
   if(!SS.items.length)h+='<div class="empty" style="margin-top:8px">Qui compaiono le chiamate concluse: puoi modificarle in qualsiasi momento.</div>';
   else h+=SS.items.map((it,i)=>({it,i})).reverse().map(({it,i})=>{const st=liveStage(leadKey(it),i+1);
     return '<div class="li"><div class="li-h"><b>'+esc(it.name||'Chiamata '+(i+1))+(st?' '+stageChip('lead',st):'')+'</b><small>'+hhmm(it.t)+'</small></div>'
-    +(it.src?'<p class="srcl"><b>Source:</b> '+esc(it.src)+'</p>':'')+chips(callTrail(it))+(it.reason?'<p><b>Motivo:</b> '+esc(it.reason)+'</p>':'')+(it.quando?'<p><b>Richiamare:</b> '+esc(it.quando)+'</p>':'')+(it.note?'<p class="nt">'+esc(it.note)+'</p>':'')
+    +(it.src?'<p class="srcl"><b>Fonte:</b> '+esc(it.src)+'</p>':'')+chips(callTrail(it))+(it.reason?'<p><b>Motivo:</b> '+esc(it.reason)+'</p>':'')+(it.quando?'<p><b>Richiamare:</b> '+esc(it.quando)+'</p>':'')+(it.note?'<p class="nt">'+esc(it.note)+'</p>':'')
     +'<div class="acts" style="justify-content:flex-start"><button class="lnk" data-edit="'+i+'">Modifica</button>'+(it.risposto?'<button class="lnk" data-copy="'+i+'">Copia per CRM</button>':'')+'</div></div>'}).join('');
   h+='</aside></div></div>';
   el.innerHTML=h;bindSession();
@@ -1866,7 +1867,7 @@ function callCard(){
       +'<div class="q">La ricerca è confermata?</div><div class="btns"><button class="btn ok big" data-a="ric">Ricerca confermata</button><button class="btn ko big" data-a="noric">No ricerca<small>da risentire</small></button></div>';
   } else if(c.step==='done'){
     const now=key?liveStage(key,c.idx+1):null;
-    h+='<dl class="sumbox"><div><dt>Ora</dt><dd>'+hhmm(c.t)+'</dd></div><div><dt>Esito</dt><dd>'+chips(callTrail(c))+'</dd></div>'+(c.src?'<div><dt>Source</dt><dd>'+esc(c.src)+'</dd></div>':'')+(now?'<div><dt>Pipeline</dt><dd>'+stageChip('lead',now)+'</dd></div>':'')
+    h+='<dl class="sumbox"><div><dt>Ora</dt><dd>'+hhmm(c.t)+'</dd></div><div><dt>Esito</dt><dd>'+chips(callTrail(c))+'</dd></div>'+(c.src?'<div><dt>Fonte</dt><dd>'+esc(c.src)+'</dd></div>':'')+(now?'<div><dt>Pipeline</dt><dd>'+stageChip('lead',now)+'</dd></div>':'')
       +(c.reason?'<div><dt>Motivo</dt><dd>'+esc(c.reason)+(c.rnote?' · '+esc(c.rnote):'')+'</dd></div>':'')+(c.quando?'<div><dt>Richiamare</dt><dd>'+esc(c.quando)+'</dd></div>':'')+'</dl>'
       +'<div class="f"><label for="c-note">Note per il CRM</label><textarea id="c-note" placeholder="Nessuna nota">'+esc(c.note)+'</textarea></div>'
       +'<div class="btns three"><button class="btn ghost" data-a="editcur">Modifica esito</button><button class="btn ghost" data-a="copy">Copia per CRM</button><button class="btn" data-a="next">Prossima chiamata</button></div>'
@@ -1919,7 +1920,7 @@ function act(a){
   const nm=$('#c-name');if(nm)c.name=nm.value;
   if((a==='risposto'||a==='nonrisposto')&&!tidy(c.name)){toast('Scrivi il nome del lead: serve per riconoscerlo quando lo richiami.');nm&&nm.focus();return}
   if(a==='risposto'||a==='nonrisposto'){const sv=readSrc($('.sess'),'c');if(sv!=null)c.src=sv;
-    if(!tidy(c.src)){toast('Scegli da dove arriva il lead, o scrivi un nuovo source.');const i=$('#c-src');i&&i.focus();return}
+    if(!tidy(c.src)){toast('Scegli da dove arriva il lead, o scrivi una nuova fonte.');const i=$('#c-src');i&&i.focus();return}
     c.src=canonSrc(c.src);addSource(c.src)}
   switch(a){
     case 'risposto':c.name=tidy(c.name);c.risposto=true;c.t=Date.now();c.step='answered';break;
