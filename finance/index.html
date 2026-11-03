@@ -109,7 +109,7 @@ header.top{display:flex;justify-content:space-between;align-items:center;padding
 /* nav + fab */
 nav.tabs{position:fixed;left:0;right:0;bottom:0;background:var(--surface);border-top:1px solid var(--line);display:flex;justify-content:center;padding-bottom:env(safe-area-inset-bottom,0px);padding-left:env(safe-area-inset-left,0px);padding-right:env(safe-area-inset-right,0px);z-index:20}
 nav.tabs .wrap{display:flex;width:100%;max-width:560px}
-nav.tabs button{flex:1;min-width:0;background:none;border:0;padding:10px 2px 12px;display:flex;flex-direction:column;align-items:center;gap:4px;font-size:12.5px;font-weight:600;color:var(--muted)}
+nav.tabs button{flex:1;min-width:0;background:none;border:0;padding:10px 0 12px;display:flex;flex-direction:column;align-items:center;gap:4px;font-size:12px;font-weight:600;color:var(--muted)}
 nav.tabs button svg{width:24px;height:24px;display:block}
 nav.tabs button[aria-selected="true"]{color:var(--ink)}
 nav.tabs button[data-view="inv"][aria-selected="true"]{color:var(--inv)}
@@ -225,6 +225,8 @@ nav.tabs button[data-view="inv"][aria-selected="true"]{color:var(--inv)}
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="6" width="18" height="13" rx="3"/><path d="M3 10h18M16 15h2"/></svg>Conto</button>
   <button data-view="stats" aria-selected="false">
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 20V10M10 20V4M16 20v-7M22 20H2"/></svg>Statistiche</button>
+  <button data-view="mamma" aria-selected="false">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20s-7-4.4-7-10a4 4 0 0 1 7-2.6A4 4 0 0 1 19 10c0 5.6-7 10-7 10z"/></svg>Mamma</button>
   <button data-view="estratto" aria-selected="false">
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 3h9l4 4v14H6z"/><path d="M9 11h7M9 15h7M9 7h4"/></svg>Estratto</button>
   <button data-view="inv" aria-selected="false">
@@ -240,12 +242,12 @@ nav.tabs button[data-view="inv"][aria-selected="true"]{color:var(--inv)}
 "use strict";
 // ---------- costanti ----------
 const CAT_IN = [{k:"Stipendio",c:"#13803f"},{k:"Provvigioni",c:"#4d9a2a"},{k:"Spotify",c:"#1db954"},{k:"Crediti",c:"#0f766e"},{k:"Cash",c:"#65a30d"}];
-const CAT_OUT = [{k:"Affitto",c:"#7c5cff"},{k:"Benzina",c:"#e3a008"},{k:"Abbonamenti",c:"#0ea5a4"},{k:"Cibo",c:"#f97316"},{k:"Intrattenimento",c:"#db2777"},{k:"Altro",c:"#8a8a87"}];
+const CAT_OUT = [{k:"Affitto",c:"#7c5cff"},{k:"Benzina",c:"#e3a008"},{k:"Abbonamenti",c:"#0ea5a4"},{k:"Cibo",c:"#f97316"},{k:"Intrattenimento",c:"#db2777"},{k:"Riscaldamento",c:"#dc2626"},{k:"Parcheggio",c:"#2563eb"},{k:"Mamma",c:"#c026d3"},{k:"Altro",c:"#8a8a87"}];
 const CAT_INV = [{k:"Risparmio",c:"#0e7490"},{k:"Azioni",c:"#1e40af"},{k:"ETF",c:"#3b82f6"},{k:"Crypto",c:"#93c5fd"},{k:"3° pilastro",c:"#0891b2"},{k:"Altro",c:"#64748b"}];
 // Spese variabili che il budget divide. Pesi di riferimento per una persona sola con reddito basso
 // (alimentari la voce più grande, poi auto), ricavati dai budget tipo delle consulenze svizzere.
-const VAR_CATS = ["Cibo","Benzina","Intrattenimento","Altro"];
-const REF_W = {Cibo:0.45,Benzina:0.30,Intrattenimento:0.13,Altro:0.12};
+const VAR_CATS = ["Cibo","Benzina","Intrattenimento","Riscaldamento","Parcheggio","Mamma","Altro"];
+const REF_W = {Cibo:0.40,Benzina:0.26,Intrattenimento:0.11,Riscaldamento:0.08,Parcheggio:0.05,Mamma:0.06,Altro:0.10};
 const VAR_SHARE = 0.8; // entrate variabili (provvigioni ecc.): conto solo l'80% della media, per prudenza
 const COLOR = {}; [...CAT_IN,...CAT_OUT].forEach(x=>COLOR[x.k]=x.c);
 const INVCOLOR = {}; CAT_INV.forEach(x=>INVCOLOR[x.k]=x.c);
@@ -275,7 +277,7 @@ const esc = s => String(s??"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">
 const uid = () => Date.now().toString(36)+Math.random().toString(36).slice(2,8);
 
 // ---------- stato ----------
-const S = { cfg:null, tx:{}, subs:{}, inv:{}, goals:{}, ready:false, view:"conto", month:ym(today()), stMonth:ym(today()), stFilter:"all", remote:false, check:null };
+const S = { cfg:null, tx:{}, subs:{}, inv:{}, goals:{}, ready:false, view:"conto", month:ym(today()), stMonth:ym(today()), stFilter:"all", mamMonth:ym(today()), remote:false, check:null };
 const defCfg = () => ({ start:0, startSet:false, rentAmt:0, rentDay:1, rentFrom:ym(today()) });
 const cfg = () => Object.assign(defCfg(), S.cfg||{});
 
@@ -540,8 +542,8 @@ const $=s=>document.querySelector(s);
 function render(){
   document.querySelectorAll("nav.tabs button").forEach(b=>b.setAttribute("aria-selected", String(b.dataset.view===S.view)));
   $("#fab").classList.toggle("inv", S.view==="inv");
-  $("#brand").textContent = {inv:"Investimenti",estratto:"Estratto conto",stats:"Statistiche"}[S.view]||"Conto";
-  $("#view").innerHTML = S.view==="inv" ? renderInv() : S.view==="estratto" ? renderStatement() : S.view==="stats" ? renderStats() : renderConto();
+  $("#brand").textContent = {inv:"Investimenti",estratto:"Estratto conto",stats:"Statistiche",mamma:"Mamma"}[S.view]||"Conto";
+  $("#view").innerHTML = S.view==="inv" ? renderInv() : S.view==="estratto" ? renderStatement() : S.view==="stats" ? renderStats() : S.view==="mamma" ? renderMamma() : renderConto();
   if(S.check){ const v=$("#chk-out"); if(v) v.innerHTML=S.check; }
 }
 
@@ -665,6 +667,28 @@ function renderStats(){
   return h;
 }
 
+function renderMamma(){
+  const t=today(), m=S.mamMonth, cm=ym(t);
+  const all=Object.entries(S.tx).filter(([,x])=>x.type==="out" && x.cat==="Mamma" && x.date);
+  const sum=ms=>r2(all.filter(([,x])=>ms(ym(x.date))).reduce((a,[,x])=>a+(+x.amount),0));
+  const mTot=sum(k=>k===m), yTot=sum(k=>k.slice(0,4)===m.slice(0,4)), tot=sum(()=>true);
+  const rows=all.filter(([,x])=>ym(x.date)===m).sort((a,b)=>b[1].date.localeCompare(a[1].date)||(b[1].ts||0)-(a[1].ts||0));
+  const first=all.reduce((a,[,x])=>!a||ym(x.date)<a?ym(x.date):a,null);
+  const nM=first?Math.max(1,monthDiff(first,cm)+1):1, avg=r2(tot/nM);
+  const ms=[]; let k=m; for(let i=0;i<6;i++){ ms.unshift(k); k=monthAdd(k,-1); }
+  const data=ms.map(x=>({m:x,v:sum(y=>y===x)})); const max=Math.max(1,...data.map(d=>d.v));
+  const W=320,H=120,T=16,B=20,gw=W/6,bw=Math.min(26,gw*0.55), Y=v=>T+(1-v/max)*(H-T-B);
+  let g=`<line x1="0" x2="${W}" y1="${Y(0)}" y2="${Y(0)}" stroke="var(--line)"/><text x="${W}" y="${T-4}" text-anchor="end">${nf0.format(max)}</text>`;
+  data.forEach((d,i)=>{ const x=i*gw+gw/2; g+=`<rect x="${x-bw/2}" y="${Y(d.v)}" width="${bw}" height="${Math.max(0,Y(0)-Y(d.v))}" rx="3" fill="${COLOR.Mamma}"${d.m===m?"":' opacity=".5"'}/><text x="${x}" y="${H-5}" text-anchor="middle"${d.m===m?' style="fill:var(--ink);font-weight:700"':""}>${MESI_B[+d.m.slice(5)-1]}</text>`; });
+  let h=`<section class="hero"><div class="eyebrow">Speso per la mamma ${m===cm?"questo mese":"a "+MESI[+m.slice(5)-1]}</div><div class="big num" style="color:${COLOR.Mamma}"><small>CHF</small>${chf(mTot)}</div><div class="sub">${all.length?`Da inizio anno CHF ${chf(yTot)} · media CHF ${chf(avg)} al mese`:"Qui tieni il conto delle spese che paghi per lei"}</div></section><div class="stack">`;
+  h+=`<button class="btn" data-mamma-add style="width:100%">Aggiungi spesa per la mamma</button>`;
+  h+=`<div class="card"><h3>Spese per la mamma <span class="monthnav"><button data-mmonth="-1" aria-label="Mese precedente">‹</button><span>${fmtMonth(m)}</span><button data-mmonth="1" aria-label="Mese successivo" ${m>=cm?"disabled":""}>›</button></span></h3><div class="list">`;
+  if(!rows.length) h+=`<div class="empty">Nessuna spesa per la mamma in ${fmtMonth(m)}. Aggiungila con il pulsante qui sopra o dal + scegliendo Spesa → Mamma.</div>`;
+  for(const [id,x] of rows) h+=`<button class="row" data-edit-tx="${esc(id)}"><span class="dot" style="background:${COLOR.Mamma}"></span><span class="main"><div class="t">${esc(x.note||"Spesa per la mamma")}</div><div class="s">${fmtDate(x.date)}</div></span><span class="a num neg">−${chf(x.amount)}</span></button>`;
+  h+=`</div>${rows.length?`<div class="note">Tocca una spesa per modificarla o eliminarla. Le spese per la mamma si tolgono dal tuo saldo come le altre.</div>`:""}</div>`;
+  h+=`<div class="card"><h3>Ultimi 6 mesi</h3><div class="chart" style="margin-top:0"><svg viewBox="0 0 ${W} ${H}" role="img" aria-label="Spese per la mamma negli ultimi mesi">${g}</svg></div></div>`;
+  return h+`</div>`;
+}
 const GIORNI = ["domenica","lunedì","martedì","mercoledì","giovedì","venerdì","sabato"];
 function renderBudget(){
   const b=budget();
@@ -1107,6 +1131,8 @@ $("#view").addEventListener("click",e=>{
   if(b.dataset.goto){ S.view=b.dataset.goto; render(); window.scrollTo(0,0); return; }
   if(b.dataset.month){ const n=monthAdd(S.month,+b.dataset.month); if(n>=firstMonth() && n<=ym(today())){ S.month=n; render(); } return; }
   if(b.dataset.stmonth){ const n=monthAdd(S.stMonth,+b.dataset.stmonth); if(n<=ym(today())){ S.stMonth=n; render(); } return; }
+  if(b.hasAttribute("data-mamma-add")){ openEntry({section:"conto",kind:"out",data:{cat:"Mamma"}}); return; }
+  if(b.dataset.mmonth){ const n=monthAdd(S.mamMonth,+b.dataset.mmonth); if(n<=ym(today())){ S.mamMonth=n; render(); } return; }
   if(b.dataset.stfilter){ S.stFilter=b.dataset.stfilter; render(); return; }
   if(b.dataset.st){ const [coll,id]=b.dataset.st.split(":"); if(coll==="tx"){ const x=S.tx[id]; if(x) openEntry({section:"conto",kind:x.type,id,data:x}); } else { const x=S.inv[id]; if(x) openEntry({section:"inv",kind:x.kind,id,data:x}); } return; }
   if(b.dataset.goalDeposit){ const gid=b.dataset.goalDeposit, g=S.goals[gid]; if(g){ const lk=g.link&&g.link!=="none"; openEntry({section:"inv",kind:"buy",data:lk?{cat:g.link}:{cat:"Risparmio",goalId:gid}}); } return; }
