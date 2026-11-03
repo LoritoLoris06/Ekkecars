@@ -451,6 +451,7 @@ select{background:var(--surface)}
 .newsrc[hidden]{display:none}
 .btn.numko{color:var(--ko);border-color:var(--ko)}
 [hidden]{display:none!important}
+.srct td small{display:block;font-size:11px;color:var(--muted);font-weight:500}.fun .r .tot{font-weight:600;color:var(--ink)}
 .srcrow select{flex:0 0 auto;width:auto;min-width:0}.srct tr.grp td{font-size:12px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--muted);background:var(--bg)}
 @media (max-width:560px){.srcrow{flex-wrap:wrap}.srcrow input{flex:1 1 100%}}
 .nview{min-height:76px;padding:12px 14px;border:1px solid var(--field);background:var(--surface);white-space:pre-wrap;overflow-wrap:anywhere;cursor:text;line-height:1.5}
@@ -873,13 +874,13 @@ function ptDelta(r,pr){
 const FUN={
   lead:st=>[['Chiamate fatte',st.L.contattati],['Lead nuovi',st.L.nuovi],['Risposte',st.L.risposti,1],['Interessati',st.L.interessati,2],['Validi',st.L.validi,3],['Ricerche',st.L.ricerche,4],['Offerte',st.L.proposte,5],['Leasing',st.L.trattative,6],['Chiusure',st.L.chiusure,6]],
   dir:st=>[['Contatti diretti',st.D.nuovi],['Validi',st.D.valid,0],['Ricerche',st.D.ric,1],['Offerte',st.D.off,2],['Leasing',st.D.lea,3],['Chiusure',st.D.chiusure,3]]};
-function funnelHTML(rows,prevRows){
-  const max=Math.max(rows[0][1],1);
+function funnelHTML(rows,prevRows,kind){
+  const max=Math.max(rows[0][1],1), tb=rows.findIndex(r=>r[0]==='Lead nuovi'||r[0]==='Contatti diretti'), tl=kind==='dir'?'dei contatti':'dei lead';
   return '<div class="fun">'+rows.map((r,i)=>{const b=r[2], base=b!=null?rows[b]:null;
     const rate=base&&base[1]?r[1]/base[1]:null, pb=b!=null&&prevRows?prevRows[b]:null, pr=pb&&pb[1]>=5?prevRows[i][1]/pb[1]:null;
     return '<div class="fr"><span class="n">'+r[0]+'</span><span class="c num">'+grp(r[1])+'</span>'
      +'<span class="bar"><i style="width:'+Math.min(100,r[1]/max*100)+'%"></i></span>'
-     +(base?'<span class="r num">'+pct(r[1],base[1])+' '+(b===i-1?'dal passaggio precedente':'su '+base[0].toLowerCase())+(base[1]>=5?ptDelta(rate,pr):'')+'</span>':'')+'</div>'}).join('')+'</div>';
+     +(base?'<span class="r num">'+pct(r[1],base[1])+' '+(b===tb?tl:b===i-1?'dal passaggio precedente':'su '+base[0].toLowerCase())+(base[1]>=5?ptDelta(rate,pr):'')+(tb>=0&&i>tb&&b!==tb?' · <b class="tot">'+pct(r[1],rows[tb][1])+' '+tl+'</b>':'')+'</span>':'')+'</div>'}).join('')+'</div>';
 }
 
 /* ---------- suggerimenti ---------- */
@@ -1015,10 +1016,10 @@ function renderDash(kind){
   if(kind==='lead')h+=srcDashBar();
   h+=alertsHTML(kind,st)+bandHTML(st);
   if(kind==='lead')h+='<section class="tiles">'
-    +'<div class="tile"><span class="eyebrow">Chiamate fatte</span><span class="v num">'+stF.L.contattati+'</span><span class="s">'+stF.L.risposti+' '+pl(stF.L.risposti,'lead ha risposto','lead hanno risposto')+(stF.L.numko?' · '+stF.L.numko+' '+pl(stF.L.numko,'numero non valido','numeri non validi'):'')+(stF.L.doppi?' · '+stF.L.doppi+' '+pl(stF.L.doppi,'doppio','doppi'):'')+'</span>'+delta(stF.L.contattati,pv.L.contattati,vs)+'</div>'
-    +'<div class="tile"><span class="eyebrow">Validi</span><span class="v num">'+stF.L.validi+'</span><span class="s">su '+stF.L.nuovi+' '+pl(stF.L.nuovi,'lead nuovo','lead nuovi')+'</span>'+delta(stF.L.validi,pv.L.validi,vs)+'</div>'
-    +'<div class="tile"><span class="eyebrow">Offerte</span><span class="v num">'+stF.L.proposte+'</span><span class="s">'+stF.L.ricerche+' '+pl(stF.L.ricerche,'ricerca','ricerche')+'</span>'+delta(stF.L.proposte,pv.L.proposte,vs)+'</div>'
-    +'<div class="tile"><span class="eyebrow">Chiusure lead</span><span class="v num">'+stF.L.chiusure+'</span><span class="s">'+chf(stF.mL)+' di margine</span>'+delta(stF.L.chiusure,pv.L.chiusure,vs)+'</div></section>';
+    +'<div class="tile"><span class="eyebrow">Chiamate fatte</span><span class="v num">'+stF.L.contattati+'</span><span class="s">'+stF.L.risposti+' '+pl(stF.L.risposti,'risposta','risposte')+' ('+pct(stF.L.risposti,stF.L.nuovi)+' dei lead)'+(stF.L.numko?' · '+stF.L.numko+' '+pl(stF.L.numko,'numero non valido','numeri non validi'):'')+(stF.L.doppi?' · '+stF.L.doppi+' '+pl(stF.L.doppi,'doppio','doppi'):'')+'</span>'+delta(stF.L.contattati,pv.L.contattati,vs)+'</div>'
+    +'<div class="tile"><span class="eyebrow">Validi</span><span class="v num">'+stF.L.validi+'</span><span class="s">'+pct(stF.L.validi,stF.L.nuovi)+' di '+stF.L.nuovi+' '+pl(stF.L.nuovi,'lead nuovo','lead nuovi')+'</span>'+delta(stF.L.validi,pv.L.validi,vs)+'</div>'
+    +'<div class="tile"><span class="eyebrow">Offerte</span><span class="v num">'+stF.L.proposte+'</span><span class="s">'+pct(stF.L.proposte,stF.L.nuovi)+' dei lead · '+stF.L.ricerche+' '+pl(stF.L.ricerche,'ricerca','ricerche')+'</span>'+delta(stF.L.proposte,pv.L.proposte,vs)+'</div>'
+    +'<div class="tile"><span class="eyebrow">Chiusure lead</span><span class="v num">'+stF.L.chiusure+'</span><span class="s">'+pct(stF.L.chiusure,stF.L.nuovi)+' dei lead · '+chf(stF.mL)+' di margine</span>'+delta(stF.L.chiusure,pv.L.chiusure,vs)+'</div></section>';
   else h+='<section class="tiles">'
     +'<div class="tile"><span class="eyebrow">Contatti diretti</span><span class="v num">'+stF.D.nuovi+'</span><span class="s">nuovi nel mese</span>'+delta(stF.D.nuovi,pv.D.nuovi,vs)+'</div>'
     +'<div class="tile"><span class="eyebrow">Validi</span><span class="v num">'+stF.D.valid+'</span><span class="s">'+pct(stF.D.valid,stF.D.nuovi)+' dei contatti</span>'+delta(stF.D.valid,pv.D.valid,vs)+'</div>'
@@ -1028,7 +1029,7 @@ function renderDash(kind){
     +insights(kind,st).map(([t,x])=>'<article><span class="eyebrow">'+t+'</span><p>'+esc(x)+'</p></article>').join('')+'</div></section>';
   h+=nowHTML(kind);
   const pr=prevFull.hasData?prevFull:null;
-  h+='<div class="grid2"><section class="card '+(kind==='lead'?'sec-l':'sec-r')+'"><div class="card-h"><h2>Funnel del mese</h2><span class="note">Ogni scheda contata una volta</span></div>'+funnelHTML(FUN[kind](stF),pr&&FUN[kind](pr))+'</section>'
+  h+='<div class="grid2"><section class="card '+(kind==='lead'?'sec-l':'sec-r')+'"><div class="card-h"><h2>Funnel del mese</h2><span class="note">Ogni scheda contata una volta</span></div>'+funnelHTML(FUN[kind](stF),pr&&FUN[kind](pr),kind)+'</section>'
     +'<section class="card"><div class="card-h"><h2>'+(kind==='lead'?'Chiamate':'Nuovi contatti')+' per giorno</h2></div><div class="actsum" id="act-sum"></div><div class="chart" id="act"></div><div class="legend" id="act-legend"></div></section></div>';
   if(kind==='lead')h+=srcDashHTML();
   h+='<section class="card"><div class="card-h"><h2>Guadagno cumulato</h2><span class="note">Lead e contatti diretti insieme</span></div><div class="chart" id="chart"></div><div class="legend" id="chart-legend"></div></section>';
@@ -1056,7 +1057,7 @@ function campaignDash(){
     +'<div class="tile"><span class="eyebrow">Validi</span><span class="v num">'+st.L.validi+'</span><span class="s">'+pct(st.L.validi,st.L.nuovi)+' dei lead · '+st.L.proposte+' '+pl(st.L.proposte,'offerta','offerte')+'</span></div>'
     +'<div class="tile"><span class="eyebrow">Chiusure</span><span class="v num">'+st.L.chiusure+'</span><span class="s">'+pct(st.L.chiusure,st.L.nuovi)+' dei lead · '+chf(st.mL)+' di margine</span></div></section>';
   h+=nowHTML('lead');
-  h+='<section class="card sec-l"><div class="card-h"><h2>Funnel della campagna</h2><span class="note">Dall\'inizio a oggi · ogni scheda contata una volta</span></div>'+funnelHTML(FUN.lead(st),null)+'</section>';
+  h+='<section class="card sec-l"><div class="card-h"><h2>Funnel della campagna</h2><span class="note">Dall\'inizio a oggi · ogni scheda contata una volta</span></div>'+funnelHTML(FUN.lead(st),null,'lead')+'</section>';
   const sl=st.sales.filter(x=>x.kind==='lead');
   h+='<section class="card"><div class="card-h"><h2>Chiusure della campagna</h2><span class="note">'+chf(st.mL)+' di margine</span></div>'
     +(sl.length?sl.map(x=>saleRow(x)).join(''):'<div class="empty">Nessuna chiusura per questa campagna.</div>')+'</section>';
@@ -1069,11 +1070,12 @@ function srcDashHTML(){
   const camp=srcRows('all').filter(r=>r.src&&!srcMonthly(r.src)), mon=srcRows(ym).filter(r=>srcMonthly(r.src)), rows=camp.concat(mon), has=sourcesList().length;
   let h='<section class="card"><div class="card-h"><h2>Per fonte</h2><span class="note">Campagne dall\'inizio · canali '+(aM(monthName(ym)))+'</span></div>';
   if(!rows.length||!has)return h+'<div class="empty">Quando indichi da dove arriva ogni lead nelle sessioni, qui vedi quale fonte porta più risposte, validi e chiusure.</div></section>';
-  const tr=(r,lbl,cls)=>'<tr'+(cls?' class="'+cls+'"':'')+'><td>'+lbl+'</td><td class="num">'+r.nuovi+'</td><td class="num">'+r.chiamate+'</td><td class="num">'+r.numko+'</td><td class="num">'+r.doppi+'</td><td class="num">'+r.risp+'</td><td class="num">'+r.valid+'</td><td class="num">'+r.off+'</td><td class="num">'+r.chius+'</td><td class="num">'+(r.marg?chf(r.marg):'—')+'</td></tr>';
+  const P=(n,b)=>'<td class="num">'+n+(b&&n?'<small>'+pct(n,b)+'</small>':'')+'</td>';
+  const tr=(r,lbl,cls)=>'<tr'+(cls?' class="'+cls+'"':'')+'><td>'+lbl+'</td><td class="num">'+r.nuovi+'</td><td class="num">'+r.chiamate+'</td>'+P(r.numko,r.nuovi)+P(r.doppi,r.nuovi+r.doppi)+P(r.risp,r.nuovi)+P(r.valid,r.nuovi)+P(r.off,r.nuovi)+P(r.chius,r.nuovi)+'<td class="num">'+(r.marg?chf(r.marg):'—')+'</td></tr>';
   h+='<div class="tbl-wrap"><table class="negt srct"><thead><tr><th>Fonte</th><th>Lead nuovi</th><th>Chiamate</th><th>Num. non validi</th><th>Doppi</th><th>Risposte</th><th>Validi</th><th>Offerte</th><th>Chiusure</th><th>Margine</th></tr></thead><tbody>'
     +(camp.length?'<tr class="grp"><td colspan="10">Campagne · dall\'inizio</td></tr>'+camp.map(r=>tr(r,esc(r.src))).join(''):'')
     +(mon.length?'<tr class="grp"><td colspan="10">Canali · '+monthName(ym)+'</td></tr>'+mon.map(r=>tr(r,r.src?esc(r.src):'<i>Senza fonte</i>')).join(''):'')+'</tbody></table></div>'
-    +'<p class="h" style="margin:10px 0 0;font-size:13px;color:var(--muted)">Ogni lead conta per la sua fonte. Per cambiarlo apri la scheda dalla pipeline.</p></section>';
+    +'<p class="h" style="margin:10px 0 0;font-size:13px;color:var(--muted)">Le percentuali sono sui lead nuovi della fonte (i doppi sul totale dei lead arrivati). Ogni lead conta per la sua fonte: per cambiarla apri la scheda dalla pipeline.</p></section>';
   return h}
 function saleRow(s){
   return '<div class="sale"><div><div class="a">'+esc(s.name||s.auto||'Chiusura')+'</div><div class="m">'+dmy(s.date)+(s.name&&s.auto?' · '+esc(s.auto):'')+' · <span class="chip '+(s.kind==='lead'?'on':'')+'">'+(s.kind==='lead'?'Lead':'Contatto diretto')+'</span>'+(s.legacy?' <span class="chip">Inserita a mano</span>':'')+'</div></div>'
