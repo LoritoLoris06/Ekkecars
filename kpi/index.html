@@ -450,6 +450,9 @@ select{background:var(--surface)}
 .newsrc{display:flex;flex-direction:column;gap:6px;margin-top:8px}
 .newsrc[hidden]{display:none}
 .btn.numko{color:var(--ko);border-color:var(--ko)}
+[hidden]{display:none!important}
+.srcrow select{flex:0 0 auto;width:auto;min-width:0}.srct tr.grp td{font-size:12px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--muted);background:var(--bg)}
+@media (max-width:560px){.srcrow{flex-wrap:wrap}.srcrow input{flex:1 1 100%}}
 .nview{min-height:76px;padding:12px 14px;border:1px solid var(--field);background:var(--surface);white-space:pre-wrap;overflow-wrap:anywhere;cursor:text;line-height:1.5}
 .nview:hover{border-color:var(--muted)}.nview:focus-visible{outline:2px solid var(--accent,#EE7A3C);outline-offset:2px}.nview .ph{color:var(--muted)}
 #cd-note{width:100%;min-height:120px;resize:vertical}
@@ -628,6 +631,8 @@ const canonSrc=v=>{v=tidy(v);if(!v)return '';return sourcesList().find(x=>sameSr
 async function addSource(v){v=canonSrc(v);if(!v)return '';const cur=S.settings.sources||[];
   if(!cur.some(x=>sameSrc(x,v)))await put('settings','main',{...S.settings,sources:[...cur,v]});return v}
 const SRC_NONE='__none';
+const SRC_MONTHLY_DEF=['outbound','sito web','sito'];
+const srcMonthly=f=>{if(!f||f===SRC_NONE)return true;const m=(S.settings.srcMode||{})[normName(f)];return m?m==='mese':SRC_MONTHLY_DEF.includes(normName(f))};
 const tryNum=st=>st&&/^x\d$/.test(st.sys||'')?+st.sys.slice(1):0;
 function callTarget(it,cur){ // fase a cui porta una chiamata, o null se la scheda resta dov'è
   const K='lead', st=cur?stageOf(K,cur):null, lv=st?st.lvl:0;
@@ -708,7 +713,7 @@ function adjOf(date){
 async function ensureV2(date){const day=S.days[date];if(!day||day.v===2)return;await put('days',date,{date,v:2,adj:{L:adjOf(date)},updatedAt:Date.now()})}
 
 /* ---------- numeri del mese ---------- */
-const inM=(d,ym,cut)=>d&&ymOf(d)===ym&&!(cut&&d>cut);
+const inM=(d,ym,cut)=>d&&(ym==='all'||ymOf(d)===ym)&&!(cut&&d>cut);
 function salesOf(ym,cut){
   const out=[];
   Object.entries(S.sales).forEach(([id,s])=>{if(inM(s.date,ym,cut))out.push({id,legacy:true,kind:s.channel==='diretta'?'dir':'lead',...s})});
@@ -825,7 +830,7 @@ function renderView(){
   if(DRAG)return; // non ridisegno mentre trascini una scheda
   $('#m-label').textContent=monthLabel(ym);
   const sub=view==='lead'||view==='dir'?SUB[view]:null;
-  $('.month').hidden=view==='set'||sub==='pipe';
+  $('.month').hidden=view==='set'||sub==='pipe'||(view==='lead'&&sub==='dash'&&!!srcD&&!srcMonthly(srcD));
   const m=$('#main'), bd=$('#board');if(bd)boardScroll=bd.scrollLeft;
   let h='';
   if(sub){h+=subnavHTML(view);
@@ -1003,6 +1008,7 @@ function nowHTML(kind){
 }
 function renderDash(kind){
   if(kind!=='lead')srcD='';
+  if(kind==='lead'&&srcD&&!srcMonthly(srcD))return campaignDash();
   const st=stats(ym), stF=kind==='lead'&&srcD?withSrc(srcD,()=>stats(ym)):st, pc=kind==='lead'&&srcD?withSrc(srcD,()=>prevComparable(st)):prevComparable(st), pv=pc.st, vs=pc.same?'vs '+monthName(pv.ym)+' (stesso giorno)':'vs '+monthName(pv.ym), prevFull=kind==='lead'&&srcD?withSrc(srcD,()=>stats(ymAdd(ym,-1))):stats(ymAdd(ym,-1)), prevGen=stats(ymAdd(ym,-1)), draft=lsGet(DRAFT);
   let h='';
   if(kind==='lead'&&draft&&draft.type==='lead')h+='<div class="resume"><span>Hai una sessione di chiamate in corso, iniziata alle '+hhmm(draft.startedAt)+'.</span><button class="btn" id="resume">Riprendi la sessione</button></div>';
@@ -1031,18 +1037,42 @@ function renderDash(kind){
     +(sl.length?sl.map(s=>saleRow(s)).join(''):'<div class="empty">Nessuna chiusura in '+monthName(ym)+'. Le chiusure nascono spostando una scheda in Chiusura.</div>')+'</section>';
   return h;
 }
+function campaignDash(){
+  const st=withSrc(srcD,()=>stats('all')), draft=lsGet(DRAFT), cs=cardsOf('lead').filter(c=>srcMatch(c,srcD));
+  const dates=cs.flatMap(c=>c.calls.map(x=>x.date)).concat(cs.map(c=>c.created)).filter(Boolean).sort(), first=dates[0], last=dates[dates.length-1];
+  const days=first?daysBetween(first,today())+1:0, active=new Set(cs.flatMap(c=>c.calls.map(x=>x.date))).size;
+  let h='';
+  if(draft&&draft.type==='lead')h+='<div class="resume"><span>Hai una sessione di chiamate in corso, iniziata alle '+hhmm(draft.startedAt)+'.</span><button class="btn" id="resume">Riprendi la sessione</button></div>';
+  h+=srcDashBar();
+  h+='<section class="band"><div><div class="eyebrow">Campagna · '+esc(srcD)+'</div><div class="big num"><small>CHF</small>'+grp(st.gL)+'</div>'
+    +'<div class="sub">Il tuo guadagno dall\'inizio della campagna ('+S.settings.pctOnline+'% su '+chf(st.mL)+' di margine)</div></div>'
+    +'<div class="proj">'+(first?'<div class="row"><span>Primo lead</span><b class="num">'+dmy(first)+'</b></div><div class="row"><span>Ultima attività</span><span class="num">'+dmy(last)+'</span></div>'
+      +'<div class="row"><span>Durata</span><span class="num">'+days+' '+pl(days,'giorno','giorni')+' · '+active+' '+pl(active,'giorno','giorni')+' con chiamate</span></div>'
+      +'<div class="row"><span>Resa</span><span class="num">'+(st.L.nuovi?chf(st.gL/st.L.nuovi)+' per lead':'—')+'</span></div>'
+      :'<div class="row"><span>Nessun lead ancora per questa campagna.</span></div>')+'</div></section>';
+  h+='<section class="tiles">'
+    +'<div class="tile"><span class="eyebrow">Lead</span><span class="v num">'+st.L.nuovi+'</span><span class="s">'+st.L.contattati+' '+pl(st.L.contattati,'chiamata','chiamate')+(st.L.numko?' · '+st.L.numko+' '+pl(st.L.numko,'numero non valido','numeri non validi'):'')+(st.L.doppi?' · '+st.L.doppi+' '+pl(st.L.doppi,'doppio','doppi'):'')+'</span></div>'
+    +'<div class="tile"><span class="eyebrow">Risposte</span><span class="v num">'+st.L.risposti+'</span><span class="s">'+pct(st.L.risposti,st.L.nuovi)+' dei lead</span></div>'
+    +'<div class="tile"><span class="eyebrow">Validi</span><span class="v num">'+st.L.validi+'</span><span class="s">'+pct(st.L.validi,st.L.nuovi)+' dei lead · '+st.L.proposte+' '+pl(st.L.proposte,'offerta','offerte')+'</span></div>'
+    +'<div class="tile"><span class="eyebrow">Chiusure</span><span class="v num">'+st.L.chiusure+'</span><span class="s">'+pct(st.L.chiusure,st.L.nuovi)+' dei lead · '+chf(st.mL)+' di margine</span></div></section>';
+  h+=nowHTML('lead');
+  h+='<section class="card sec-l"><div class="card-h"><h2>Funnel della campagna</h2><span class="note">Dall\'inizio a oggi · ogni scheda contata una volta</span></div>'+funnelHTML(FUN.lead(st),null)+'</section>';
+  const sl=st.sales.filter(x=>x.kind==='lead');
+  h+='<section class="card"><div class="card-h"><h2>Chiusure della campagna</h2><span class="note">'+chf(st.mL)+' di margine</span></div>'
+    +(sl.length?sl.map(x=>saleRow(x)).join(''):'<div class="empty">Nessuna chiusura per questa campagna.</div>')+'</section>';
+  return h}
 function srcDashBar(){const L=sourcesList(),cs=cardsOf('lead');if(srcD&&srcD!==SRC_NONE&&!L.some(x=>sameSrc(x,srcD)))srcD='';
   return '<div class="srcbar"><label class="srcsel"><span>KPI per fonte</span><select id="src-d" aria-label="Mostra le KPI di una sola fonte"><option value="">Tutte le fonti</option>'+L.map(s=>'<option value="'+esc(s)+'"'+(sameSrc(s,srcD)?' selected':'')+'>'+esc(s)+'</option>').join('')
     +(cs.some(c=>!c.src)?'<option value="'+SRC_NONE+'"'+(srcD===SRC_NONE?' selected':'')+'>Senza fonte</option>':'')+'</select></label>'
-    +(srcD?'<span class="note">Numeri, funnel, grafico e chiusure di <b>'+esc(srcD===SRC_NONE?'Senza fonte':srcD)+'</b>. Guadagno, obiettivo e avvisi restano generali.</span>':'<span class="note">Stai guardando tutti i lead insieme.</span>')+'</div>'}
+    +(srcD&&!srcMonthly(srcD)?'<span class="note">Campagna: numeri dall\'inizio a oggi, il mese non conta.</span>':srcD?'<span class="note">Numeri, funnel, grafico e chiusure di <b>'+esc(srcD===SRC_NONE?'Senza fonte':srcD)+'</b> nel mese. Guadagno, obiettivo e avvisi restano generali.</span>':'<span class="note">Stai guardando tutti i lead insieme.</span>')+'</div>'}
 function srcDashHTML(){
-  const rows=srcRows(ym), has=sourcesList().length;
-  let h='<section class="card"><div class="card-h"><h2>Per fonte</h2><span class="note">'+monthName(ym)+'</span></div>';
+  const camp=srcRows('all').filter(r=>r.src&&!srcMonthly(r.src)), mon=srcRows(ym).filter(r=>srcMonthly(r.src)), rows=camp.concat(mon), has=sourcesList().length;
+  let h='<section class="card"><div class="card-h"><h2>Per fonte</h2><span class="note">Campagne dall\'inizio · canali '+(aM(monthName(ym)))+'</span></div>';
   if(!rows.length||!has)return h+'<div class="empty">Quando indichi da dove arriva ogni lead nelle sessioni, qui vedi quale fonte porta più risposte, validi e chiusure.</div></section>';
-  const T=rows.reduce((a,r)=>{for(const k in r)if(k!=='src')a[k]=(a[k]||0)+r[k];return a},{});
   const tr=(r,lbl,cls)=>'<tr'+(cls?' class="'+cls+'"':'')+'><td>'+lbl+'</td><td class="num">'+r.nuovi+'</td><td class="num">'+r.chiamate+'</td><td class="num">'+r.numko+'</td><td class="num">'+r.doppi+'</td><td class="num">'+r.risp+'</td><td class="num">'+r.valid+'</td><td class="num">'+r.off+'</td><td class="num">'+r.chius+'</td><td class="num">'+(r.marg?chf(r.marg):'—')+'</td></tr>';
   h+='<div class="tbl-wrap"><table class="negt srct"><thead><tr><th>Fonte</th><th>Lead nuovi</th><th>Chiamate</th><th>Num. non validi</th><th>Doppi</th><th>Risposte</th><th>Validi</th><th>Offerte</th><th>Chiusure</th><th>Margine</th></tr></thead><tbody>'
-    +rows.map(r=>tr(r,r.src?esc(r.src):'<i>Senza fonte</i>')).join('')+(rows.length>1?tr(T,'<b>Totale</b>','tot'):'')+'</tbody></table></div>'
+    +(camp.length?'<tr class="grp"><td colspan="10">Campagne · dall\'inizio</td></tr>'+camp.map(r=>tr(r,esc(r.src))).join(''):'')
+    +(mon.length?'<tr class="grp"><td colspan="10">Canali · '+monthName(ym)+'</td></tr>'+mon.map(r=>tr(r,r.src?esc(r.src):'<i>Senza fonte</i>')).join(''):'')+'</tbody></table></div>'
     +'<p class="h" style="margin:10px 0 0;font-size:13px;color:var(--muted)">Ogni lead conta per la sua fonte. Per cambiarlo apri la scheda dalla pipeline.</p></section>';
   return h}
 function saleRow(s){
@@ -1652,13 +1682,13 @@ function pipeEditorHTML(kind){
    +'</div><div class="row-end" style="margin-top:12px"><button type="button" class="btn ghost" data-padd="'+kind+'">+ Aggiungi fase</button><button type="button" class="btn ghost" data-preset="'+kind+'">Ripristina</button><button type="button" class="btn" data-psave="'+kind+'">Salva fasi</button></div></section>';
 }
 function srcEditorHTML(){
-  if(!SRD)SRD=sourcesList().map(s=>({old:s,name:s}));
+  if(!SRD)SRD=sourcesList().map(s=>({old:s,name:s,mode:srcMonthly(s)?'mese':'campagna'}));
   const cnt=s=>cardsOf('lead').filter(c=>sameSrc(c.src,s)).length;
   return '<section class="card"><div class="card-h"><h2>Fonti dei lead</h2><span class="note">Campagne e canali da cui arrivano</span></div>'
-   +(SRD.length?SRD.map((r,i)=>'<div class="srcrow"><input type="text" value="'+esc(r.name)+'" data-si="'+i+'" aria-label="Nome della fonte" autocomplete="off">'
+   +(SRD.length?SRD.map((r,i)=>'<div class="srcrow"><input type="text" value="'+esc(r.name)+'" data-si="'+i+'" aria-label="Nome della fonte" autocomplete="off"><select data-smode="'+i+'" aria-label="Tipo di fonte"><option value="campagna"'+(r.mode!=='mese'?' selected':'')+'>Campagna</option><option value="mese"'+(r.mode==='mese'?' selected':'')+'>Ogni mese</option></select>'
       +'<small>'+(r.old?cnt(r.old)+' lead':'nuova')+'</small><span class="pbt"><button type="button" data-smv="-1" data-i="'+i+'" aria-label="Sposta su"'+(i===0?' disabled':'')+'>↑</button><button type="button" data-smv="1" data-i="'+i+'" aria-label="Sposta giù"'+(i===SRD.length-1?' disabled':'')+'>↓</button></span><button type="button" class="x2" data-srm="'+i+'" aria-label="Elimina la fonte">×</button></div>').join('')
       :'<div class="empty" style="margin-bottom:10px">Nessuna fonte. Si aggiungono da sole quando le scrivi in sessione, oppure aggiungile qui.</div>')
-   +'<span class="h" style="display:block;margin:2px 0 4px;font-size:13px;color:var(--muted)">Se rinomini una fonte, cambia su tutti i suoi lead. Se due fonti prendono lo stesso nome si uniscono. Con le frecce scegli l\'ordine: è lo stesso che vedi nelle tendine.</span>'
+   +'<span class="h" style="display:block;margin:2px 0 4px;font-size:13px;color:var(--muted)">Se rinomini una fonte, cambia su tutti i suoi lead. Se due fonti prendono lo stesso nome si uniscono. Con le frecce scegli l\'ordine: è lo stesso che vedi nelle tendine. <b>Campagna</b>: in dashboard vedi i numeri dall\'inizio. <b>Ogni mese</b>: canali continui come Outbound o Sito web, che scegli mese per mese.</span>'
    +'<div class="row-end" style="margin-top:12px"><button type="button" class="btn ghost" id="src-add">+ Aggiungi fonte</button><button type="button" class="btn" id="src-save">Salva fonti</button></div></section>';
 }
 async function applySources(){
@@ -1669,7 +1699,8 @@ async function applySources(){
   for(const [id,s] of Object.entries(S.sessions)){if(!(s.items||[]).some(it=>tidy(it.src)&&ren(it.src)!==tidy(it.src)))continue;
     await put('sessions',id,{...s,items:s.items.map(it=>tidy(it.src)?{...it,src:ren(it.src)}:it)})}
   for(const [id,m] of Object.entries(S.cards)){if(m.kind!=='lead'||!tidy(m.src)||ren(m.src)===tidy(m.src))continue;await put('cards',id,{...m,src:ren(m.src)})}
-  await put('settings','main',{...S.settings,sources:keep});
+  const srcMode={};SRD.forEach(r=>{const n=tidy(r.name);if(n)srcMode[normName(n)]=r.mode==='mese'?'mese':'campagna'});
+  await put('settings','main',{...S.settings,sources:keep,srcMode});
   SRD=null;renderView();if(srcF&&!keep.some(x=>sameSrc(x,srcF))&&srcF!==SRC_NONE){srcF='';lsSet('ekk-kpi-srcf',null)}
   toast('Fonti salvate.');
 }
@@ -1718,9 +1749,10 @@ function bindSet(){
     m.querySelectorAll('[data-rk="'+k+'"]').forEach(t=>{r[t.dataset.rs]=t.value.split('\n').map(tidy).filter(x=>x&&x.toLowerCase()!=='altro')});
     await put('settings','main',{...S.settings,reasons:{...(S.settings.reasons||{}),[k]:r}});toast('Motivi salvati.')});
   m.querySelectorAll('[data-si]').forEach(i=>i.oninput=()=>{SRD[+i.dataset.si].name=i.value});
+  m.querySelectorAll('[data-smode]').forEach(x=>x.onchange=()=>{SRD[+x.dataset.smode].mode=x.value});
   m.querySelectorAll('[data-smv]').forEach(b=>b.onclick=()=>{const i=+b.dataset.i,j=i+ +b.dataset.smv;if(j<0||j>=SRD.length)return;[SRD[i],SRD[j]]=[SRD[j],SRD[i]];renderView()});
   m.querySelectorAll('[data-srm]').forEach(b=>b.onclick=()=>{SRD.splice(+b.dataset.srm,1);renderView()});
-  const sa=$('#src-add');if(sa)sa.onclick=()=>{SRD.push({old:'',name:''});renderView();const ins=$('#main').querySelectorAll('[data-si]');if(ins.length)ins[ins.length-1].focus()};
+  const sa=$('#src-add');if(sa)sa.onclick=()=>{SRD.push({old:'',name:'',mode:'campagna'});renderView();const ins=$('#main').querySelectorAll('[data-si]');if(ins.length)ins[ins.length-1].focus()};
   const ss=$('#src-save');if(ss)ss.onclick=()=>{
     const cur=sourcesList(),gone=cur.filter(o=>!SRD.some(r=>r.old===o&&tidy(r.name))),n=gone.reduce((a,o)=>a+cardsOf('lead').filter(c=>sameSrc(c.src,o)).length,0);
     if(n)confirmSheet('Togliere '+gone.length+' fonti?',n+' '+pl(n,'lead resta','lead restano')+' senza fonte: potrai assegnarne una nuova dalla scheda.','Togli e salva',applySources);else applySources()};
