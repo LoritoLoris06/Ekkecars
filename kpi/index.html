@@ -449,6 +449,10 @@ select{background:var(--surface)}
 .srcbar{display:flex;align-items:center;gap:12px 16px;flex-wrap:wrap}.srcbar .srcsel{flex:0 1 360px}.srcbar .note{font-size:13px;color:var(--muted)}
 .newsrc{display:flex;flex-direction:column;gap:6px;margin-top:8px}
 .newsrc[hidden]{display:none}
+.btn.numko{color:var(--ko);border-color:var(--ko)}
+.nview{min-height:76px;padding:12px 14px;border:1px solid var(--field);background:var(--surface);white-space:pre-wrap;overflow-wrap:anywhere;cursor:text;line-height:1.5}
+.nview:hover{border-color:var(--muted)}.nview:focus-visible{outline:2px solid var(--accent,#EE7A3C);outline-offset:2px}.nview .ph{color:var(--muted)}
+#cd-note{width:100%;min-height:120px;resize:vertical}
 @media (prefers-reduced-motion:reduce){*{transition:none!important;animation:none!important}}
 </style>
 </head>
@@ -521,6 +525,8 @@ const STAGE_DEF={
   {id:'x4',name:'X4',color:'#8C867C',lvl:0,sys:'x4'},{id:'x5',name:'X5',color:'#787167',lvl:0,sys:'x5'},
   {id:'post',name:'Posticipato',color:'#D9A21B',lvl:0,sys:'post'},
   {id:'mai',name:'Mai risposto',color:'#55504A',lvl:0,sys:'mai'},
+  {id:'numko',name:'Numero non valido',color:NEG,lvl:0,neg:true,sys:'numko'},
+  {id:'doppio',name:'Doppio',color:NEG,lvl:0,neg:true,sys:'doppio'},
   {id:'nonint',name:'Non interessato',color:NEG,lvl:0,neg:true,sys:'nonint'},
   {id:'nonval',name:'Non valido',color:NEG,lvl:0,neg:true,sys:'nonval'},
   {id:'perm',name:'Valutazione permuta',color:'#EE7A3C',lvl:1,sys:'perm'},
@@ -546,6 +552,8 @@ const STAGE_DEF={
   {id:'chi',name:'Chiusura',color:'#1E7A46',lvl:5,sys:'chi'}]};
 const REASONS_DEF={
  nonint:['Non ricorda la richiesta','Cercava solo informazioni','Ha già comprato','Prezzi troppo alti','Non è il momento'],
+ doppio:['Doppio stessa campagna','Doppio altra campagna'],
+ numko:['Numero inesistente','Numero sbagliato, risponde un\'altra persona','Numero disattivato','Cifre o prefisso mancanti','Numero falso'],
  nonval:['Budget insufficiente','Non solvibile / non finanziabile','Auto che non trattiamo','Tempi troppo lunghi','Fuori zona'],
  permko:['Valutazione troppo bassa per il cliente','Debito residuo sull\'auto','Auto non ritirabile','Cliente non vuole cederla'],
  ricko:['Auto introvabile','Budget non realistico','Requisiti troppo specifici','Tempi di consegna troppo lunghi'],
@@ -554,9 +562,14 @@ const REASONS_DEF={
 const LVL_LBL=['Prima della validazione','Valido','Ricerca','Offerta','Leasing','Chiusura'];
 const KIND_LBL={lead:'Lead',dir:'Contatti diretti'};
 const DEF_SET={pctOnline:18,pctDiretta:15,goal:0,sabato:false,callsDay:0,sources:[]};
-const stagesOf=kind=>(S.settings.pipes&&S.settings.pipes[kind]&&S.settings.pipes[kind].length?S.settings.pipes[kind]:STAGE_DEF[kind]);
+const stagesOf=kind=>{const L=(S.settings.pipes&&S.settings.pipes[kind]&&S.settings.pipes[kind].length?S.settings.pipes[kind]:STAGE_DEF[kind]);
+  if(kind!=='lead')return L; // fasi salvate prima di "Numero non valido" o "Doppio": le aggiungo dopo Mai risposto
+  const hasNum=L.some(s=>s.sys==='numko'), hasDop=L.some(s=>s.sys==='doppio'||normName(s.name)==='doppio');if(hasNum&&hasDop)return L;
+  const c=L.slice();let i=c.findIndex(s=>s.sys==='numko');if(i<0)i=c.findIndex(s=>s.sys==='mai');i=i<0?c.length:i+1;
+  if(!hasNum)c.splice(i++,0,STAGE_DEF.lead.find(s=>s.sys==='numko'));if(!hasDop)c.splice(i,0,STAGE_DEF.lead.find(s=>s.sys==='doppio'));return c};
 const stageOf=(kind,id)=>stagesOf(kind).find(s=>s.id===id)||null;
-const sysStage=(kind,sys)=>stagesOf(kind).find(s=>s.sys===sys)||null;
+const sysStage=(kind,sys)=>stagesOf(kind).find(s=>s.sys===sys)||(sys==='doppio'&&kind==='lead'?stagesOf(kind).find(s=>normName(s.name)==='doppio'):null)||null;
+const isSysStage=(kind,id,sys)=>{const t=sysStage(kind,sys);return !!t&&t.id===id};
 const reasonsOf=(kind,id)=>{const r=S.settings.reasons&&S.settings.reasons[kind]&&S.settings.reasons[kind][id];return r&&r.length?r:(REASONS_DEF[id]||[])};
 const LKEYS=[['contattati','Chiamate fatte'],['risposti','Risposte'],['interessati','Interessati'],['validi','Validi'],['ricerche','Ricerche'],['proposte','Offerte'],['trattative','Leasing']];
 
@@ -618,6 +631,8 @@ const SRC_NONE='__none';
 const tryNum=st=>st&&/^x\d$/.test(st.sys||'')?+st.sys.slice(1):0;
 function callTarget(it,cur){ // fase a cui porta una chiamata, o null se la scheda resta dov'è
   const K='lead', st=cur?stageOf(K,cur):null, lv=st?st.lvl:0;
+  if(it.numko){const t=sysStage(K,'numko');return t&&t.id!==cur?t.id:null}
+  if(it.doppio){const t=sysStage(K,'doppio');return t&&t.id!==cur?t.id:null}
   if(!it.risposto){
     if(!cur||tryNum(st)){const n=(st?tryNum(st):0)+1;const x=sysStage(K,'x'+n);return x?x.id:(sysStage(K,'mai')||{}).id}
     return null;
@@ -644,7 +659,7 @@ function engine(){
   const mark=(c,k,d)=>{if(!c.reach[k])c.reach[k]=d};
   const setStage=(c,to,e,info)=>{const st=stageOf(c.kind,to);if(!st)return;
     c.stage=to;c.stageT=e.t;c.stageDate=e.date;c.hist.push({t:e.t,date:e.date,to,...info});
-    if(c.kind==='lead'&&!tryNum(st)&&st.sys!=='mai')mark(c,'risp',e.date);
+    if(c.kind==='lead'&&!tryNum(st)&&st.sys!=='mai'&&st.sys!=='numko'&&!isSysStage('lead',st.id,'doppio'))mark(c,'risp',e.date);
     if(st.lvl>=1){mark(c,'int',e.date);mark(c,'valid',e.date)}
     if(st.lvl>=2)mark(c,'ric',e.date); if(st.lvl>=3)mark(c,'off',e.date); if(st.lvl===4)mark(c,'lea',e.date);
     c.maxLvl=Math.max(c.maxLvl,st.lvl);
@@ -669,6 +684,11 @@ function engine(){
     if(e.move){const c=cards[e.kind+'|'+e.key];if(!c)return;setStage(c,e.move.to,e,{by:'manuale',reason:e.move.reason,rnote:e.move.rnote,auto:e.move.auto,margine:e.move.margine,mid:e.move.mid,remind:e.move.remind,quando:e.move.quando})}
   });
   Object.entries(S.cards).forEach(([id,m])=>{if(m.kind!=='lead')return;const c=cards['lead|'+m.key];if(!c)return;if(m.name)c.name=m.name;if(m.note!=null)c.note=m.note;if(m.src!=null&&(m.srcT||0)>=c.srcT)c.src=tidy(m.src);c.metaId=id});
+  Object.values(cards).forEach(c=>{ // nota unica della scheda: la nota scritta a mano + le note delle chiamate successive
+    if(c.kind==='dir'){c.noteText=c.note||'';return}
+    const m=c.metaId?S.cards[c.metaId]:null, hasBase=m&&m.note!=null, since=hasBase?(m.noteT||0):0;
+    const add=c.calls.filter(x=>tidy(x.it.note)&&(x.t||0)>since).map(x=>dmy(x.date).slice(0,5)+' '+hhmm(x.t)+' — '+tidy(x.it.note));
+    c.noteText=[hasBase?m.note:'',...add].filter(x=>x&&x.trim()).join('\n')});
   Object.values(cards).forEach(c=>{if(!c.name)c.name=c.kind==='lead'?'Lead senza nome':'Contatto senza nome'});
   EC={cards,calls,ans};return EC;
 }
@@ -714,19 +734,22 @@ function stats(ym,cut){
   const L={...emptyL(),nuovi:0,chiusure:0}, D={nuovi:0,valid:0,ric:0,off:0,lea:0,chiusure:0};let active=0;
   allDates().forEach(d=>{if(!inM(d,ym,cut))return;const x=dayLead(d),y=dayDir(d);let any=0;
     for(const k in x){L[k]+=x[k];any+=x[k]} for(const k in y){D[k]+=y[k];any+=y[k]} if(any)active++});
-  cardsOf('lead').forEach(c=>{if(srcMatch(c,STAT_SRC)&&inM(c.created,ym,cut))L.nuovi++});
+  const isDop=c=>c.hist.some(h=>isSysStage('lead',h.to,'doppio'));
+  cardsOf('lead').forEach(c=>{if(srcMatch(c,STAT_SRC)&&inM(c.created,ym,cut)&&!isDop(c))L.nuovi++});
   const sales=salesOf(ym,cut), sl=sales.filter(s=>s.kind==='lead'&&(!STAT_SRC||(s.cardId?srcMatch(engine().cards[s.cardId],STAT_SRC):STAT_SRC===SRC_NONE))), sd=sales.filter(s=>s.kind==='dir');
   L.chiusure=sl.length;D.chiusure=sd.length;
+  L.doppi=cardsOf('lead').filter(c=>srcMatch(c,STAT_SRC)&&c.hist.some(h=>isSysStage('lead',h.to,'doppio')&&inM(h.date,ym,cut))).length;
+  L.numko=cardsOf('lead').filter(c=>srcMatch(c,STAT_SRC)&&c.hist.some(h=>(stageOf('lead',h.to)||{}).sys==='numko'&&inM(h.date,ym,cut))).length;
   const mL=sl.reduce((a,s)=>a+(+s.margine||0),0), mD=sd.reduce((a,s)=>a+(+s.margine||0),0), gL=sl.reduce((a,s)=>a+earn(s),0), gD=sd.reduce((a,s)=>a+earn(s),0);
   return {ym,L,D,active,sales,mL,mD,gL,gD,m:mL+mD,g:gL+gD,n:sales.length,hasData:active>0||sales.length>0};
 }
-function srcRows(ym,cut){const M={},row=k=>M[k]=M[k]||{src:k,nuovi:0,chiamate:0,risp:0,valid:0,off:0,chius:0,marg:0};
-  cardsOf('lead').forEach(c=>{const r=row(c.src||'');if(inM(c.created,ym,cut))r.nuovi++;c.calls.forEach(x=>{if(inM(x.date,ym,cut))r.chiamate++});
+function srcRows(ym,cut){const M={},row=k=>M[k]=M[k]||{src:k,nuovi:0,chiamate:0,numko:0,doppi:0,risp:0,valid:0,off:0,chius:0,marg:0};
+  cardsOf('lead').forEach(c=>{const r=row(c.src||''),dop=c.hist.find(h=>isSysStage('lead',h.to,'doppio'));if(inM(c.created,ym,cut)&&!dop)r.nuovi++;if(dop&&inM(dop.date,ym,cut))r.doppi++;c.calls.forEach(x=>{if(inM(x.date,ym,cut))r.chiamate++});if(c.hist.some(h=>(stageOf('lead',h.to)||{}).sys==='numko'&&inM(h.date,ym,cut)))r.numko++;
     if(inM(c.reach.risp,ym,cut))r.risp++;if(inM(c.reach.valid,ym,cut))r.valid++;if(inM(c.reach.off,ym,cut))r.off++;
     if(c.closure&&inM(c.closure.date,ym,cut)){r.chius++;r.marg+=+c.closure.margine||0}});
   Object.values(S.sales).forEach(s=>{if(s.channel!=='diretta'&&inM(s.date,ym,cut)){const r=row('');r.chius++;r.marg+=+s.margine||0}});
   const order=sourcesList();
-  return Object.values(M).filter(r=>r.nuovi||r.chiamate||r.risp||r.valid||r.off||r.chius).sort((a,b)=>(a.src?0:1)-(b.src?0:1)||b.chiamate-a.chiamate||order.indexOf(a.src)-order.indexOf(b.src))}
+  return Object.values(M).filter(r=>r.nuovi||r.chiamate||r.numko||r.doppi||r.risp||r.valid||r.off||r.chius).sort((a,b)=>(a.src?0:1)-(b.src?0:1)||b.chiamate-a.chiamate||order.indexOf(a.src)-order.indexOf(b.src))}
 function callLog(from,to){const out=[];Object.values(S.sessions).forEach(s=>{if(s.type!=='lead'||!s.date||s.date<from||s.date>to)return;(s.items||[]).forEach(it=>{if(it.t)out.push({date:s.date,t:it.t,ok:!!it.risposto})})});return out}
 function hourStats(calls){const h={};calls.forEach(c=>{const k=new Date(c.t).getHours();const o=h[k]=h[k]||{n:0,ok:0};o.n++;if(c.ok)o.ok++});return h}
 function bestHours(calls,min){const h=hourStats(calls),tot=calls.length,okT=calls.filter(c=>c.ok).length;
@@ -911,6 +934,8 @@ function insights(kind,st){
     const stale=live.filter(x=>x.stageDate&&daysBetween(x.stageDate,today())>=10&&(stageOf('dir',x.stage)||{}).lvl<5);
     if(stale.length)c.push(stale.length+' '+pl(stale.length,'scheda è ferma','schede sono ferme')+' da 10 giorni o più: '+stale.slice(0,3).map(x=>x.name).join(', ')+(stale.length>3?'…':'')+'. Sentile oggi.');
   }
+  if(kind==='lead'&&X.numko>=3&&X.nuovi&&X.numko/X.nuovi>=0.1){const rows=srcRows(st.ym).filter(r=>r.src&&r.nuovi>=3).sort((a,b)=>b.numko/b.nuovi-a.numko/a.nuovi),w=rows[0];
+    c.push(X.numko+' '+pl(X.numko,'lead ha','lead hanno')+' un numero non valido ('+pct(X.numko,X.nuovi)+' dei lead nuovi)'+(w&&w.numko?': la fonte peggiore è '+w.src+' ('+pct(w.numko,w.nuovi)+'). Controlla il modulo della campagna, per esempio la verifica del telefono.':'. Controlla i moduli delle campagne, per esempio la verifica del telefono.'))}
   const tr=topReasons(kind,st.ym);if(tr.length&&tr[0][1]>=2)c.push('Motivo più frequente nei non conclusi: '+tr[0][0].toLowerCase()+' ('+tr[0][1]+').');
   if(!c.length)c.push(future?'Nessun dato ancora.':'Servono almeno 5 schede per passaggio per indicarti dove migliorare. Continua a registrare.');
   out.push(['Dove migliorare',c.join(' ')]);
@@ -984,7 +1009,7 @@ function renderDash(kind){
   if(kind==='lead')h+=srcDashBar();
   h+=alertsHTML(kind,st)+bandHTML(st);
   if(kind==='lead')h+='<section class="tiles">'
-    +'<div class="tile"><span class="eyebrow">Chiamate fatte</span><span class="v num">'+stF.L.contattati+'</span><span class="s">'+stF.L.risposti+' '+pl(stF.L.risposti,'lead ha risposto','lead hanno risposto')+'</span>'+delta(stF.L.contattati,pv.L.contattati,vs)+'</div>'
+    +'<div class="tile"><span class="eyebrow">Chiamate fatte</span><span class="v num">'+stF.L.contattati+'</span><span class="s">'+stF.L.risposti+' '+pl(stF.L.risposti,'lead ha risposto','lead hanno risposto')+(stF.L.numko?' · '+stF.L.numko+' '+pl(stF.L.numko,'numero non valido','numeri non validi'):'')+(stF.L.doppi?' · '+stF.L.doppi+' '+pl(stF.L.doppi,'doppio','doppi'):'')+'</span>'+delta(stF.L.contattati,pv.L.contattati,vs)+'</div>'
     +'<div class="tile"><span class="eyebrow">Validi</span><span class="v num">'+stF.L.validi+'</span><span class="s">su '+stF.L.nuovi+' '+pl(stF.L.nuovi,'lead nuovo','lead nuovi')+'</span>'+delta(stF.L.validi,pv.L.validi,vs)+'</div>'
     +'<div class="tile"><span class="eyebrow">Offerte</span><span class="v num">'+stF.L.proposte+'</span><span class="s">'+stF.L.ricerche+' '+pl(stF.L.ricerche,'ricerca','ricerche')+'</span>'+delta(stF.L.proposte,pv.L.proposte,vs)+'</div>'
     +'<div class="tile"><span class="eyebrow">Chiusure lead</span><span class="v num">'+stF.L.chiusure+'</span><span class="s">'+chf(stF.mL)+' di margine</span>'+delta(stF.L.chiusure,pv.L.chiusure,vs)+'</div></section>';
@@ -1015,8 +1040,8 @@ function srcDashHTML(){
   let h='<section class="card"><div class="card-h"><h2>Per fonte</h2><span class="note">'+monthName(ym)+'</span></div>';
   if(!rows.length||!has)return h+'<div class="empty">Quando indichi da dove arriva ogni lead nelle sessioni, qui vedi quale fonte porta più risposte, validi e chiusure.</div></section>';
   const T=rows.reduce((a,r)=>{for(const k in r)if(k!=='src')a[k]=(a[k]||0)+r[k];return a},{});
-  const tr=(r,lbl,cls)=>'<tr'+(cls?' class="'+cls+'"':'')+'><td>'+lbl+'</td><td class="num">'+r.nuovi+'</td><td class="num">'+r.chiamate+'</td><td class="num">'+r.risp+'</td><td class="num">'+r.valid+'</td><td class="num">'+r.off+'</td><td class="num">'+r.chius+'</td><td class="num">'+(r.marg?chf(r.marg):'—')+'</td></tr>';
-  h+='<div class="tbl-wrap"><table class="negt srct"><thead><tr><th>Fonte</th><th>Lead nuovi</th><th>Chiamate</th><th>Risposte</th><th>Validi</th><th>Offerte</th><th>Chiusure</th><th>Margine</th></tr></thead><tbody>'
+  const tr=(r,lbl,cls)=>'<tr'+(cls?' class="'+cls+'"':'')+'><td>'+lbl+'</td><td class="num">'+r.nuovi+'</td><td class="num">'+r.chiamate+'</td><td class="num">'+r.numko+'</td><td class="num">'+r.doppi+'</td><td class="num">'+r.risp+'</td><td class="num">'+r.valid+'</td><td class="num">'+r.off+'</td><td class="num">'+r.chius+'</td><td class="num">'+(r.marg?chf(r.marg):'—')+'</td></tr>';
+  h+='<div class="tbl-wrap"><table class="negt srct"><thead><tr><th>Fonte</th><th>Lead nuovi</th><th>Chiamate</th><th>Num. non validi</th><th>Doppi</th><th>Risposte</th><th>Validi</th><th>Offerte</th><th>Chiusure</th><th>Margine</th></tr></thead><tbody>'
     +rows.map(r=>tr(r,r.src?esc(r.src):'<i>Senza fonte</i>')).join('')+(rows.length>1?tr(T,'<b>Totale</b>','tot'):'')+'</tbody></table></div>'
     +'<p class="h" style="margin:10px 0 0;font-size:13px;color:var(--muted)">Ogni lead conta per la sua fonte. Per cambiarlo apri la scheda dalla pipeline.</p></section>';
   return h}
@@ -1224,7 +1249,7 @@ function openCard(id){
   const histH=c.hist.slice().reverse().map(x=>'<li><span class="hd">'+dmy(x.date)+(x.t?', '+hhmm(x.t):'')+'</span>'+stageChip(K,x.to)+'<span class="hb2">'+(x.by==='chiamata'?'da chiamata':x.by==='nuova'?'scheda creata':'spostata a mano')+'</span>'
     +(x.reason?'<span class="hr">Motivo: '+esc(x.reason)+(x.rnote?' · '+esc(x.rnote):'')+'</span>':'')
     +(x.mid?'<button type="button" class="lnk ko" data-delmove="'+x.mid+'">Annulla spostamento</button>':'')+'</li>').join('');
-  const callsH=K==='lead'&&c.calls.length?'<div class="hist-mini"><span class="lbl">Chiamate ('+c.calls.length+')</span>'+c.calls.slice().reverse().slice(0,8).map(x=>'<div><small>'+dmy(x.date)+', '+hhmm(x.t)+'</small>'+chips(callTrail(x.it))+(x.it.note?'<p class="nt">'+esc(x.it.note)+'</p>':'')+'</div>').join('')+'</div>':'';
+  const callsH=K==='lead'&&c.calls.length?'<div class="hist-mini"><span class="lbl">Chiamate ('+c.calls.length+')</span>'+c.calls.slice().reverse().slice(0,8).map(x=>'<div><small>'+dmy(x.date)+', '+hhmm(x.t)+'</small>'+chips(callTrail(x.it))+'</div>').join('')+'</div>':'';
   const opts=stagesOf(K).map(z=>'<option value="'+z.id+'"'+(z.id===c.stage?' selected':'')+'>'+esc(z.name)+(z.neg?' (non concluso)':'')+'</option>').join('');
   sheet('<div class="sheet-h"><h2 class="who">'+esc(c.name)+'</h2><button class="x" data-close aria-label="Chiudi">×</button></div>'
    +'<form id="cd-f" style="display:flex;flex-direction:column;gap:14px"><div class="cd-now">'+stageChip(K,c.stage)+'<span>dal '+dmy(c.stageDate||today())+'</span></div>'
@@ -1232,17 +1257,33 @@ function openCard(id){
    +(c.closure?'<div class="okbox">Chiusura del '+dmy(c.closure.date)+(c.closure.auto?' · '+esc(c.closure.auto):'')+' · margine '+chf(c.closure.margine)+(c.closure.mid?' <button type="button" class="lnk" id="cd-clos">Modifica</button>':'')+'</div>':'')
    +'<div class="f"><label for="cd-n">Nome</label><input type="text" id="cd-n" value="'+esc(c.name)+'" autocomplete="off"></div>'
    +(K==='lead'?srcPickerHTML('cd',c.src,'Fonte'):'')
-   +'<div class="f"><label for="cd-note">Note</label><textarea id="cd-note" placeholder="Nessuna nota">'+esc(c.note||'')+'</textarea></div>'
+   +'<div class="f"><span class="lbl" id="cd-nl">Note</span><div id="cd-nbox"></div></div>'
    +'<div class="f"><label for="cd-st">Sposta in</label><select id="cd-st">'+opts+'</select></div>'
    +'<div class="row-end">'+(K==='dir'?'<button type="button" class="btn ghost ko-t" id="cd-del" style="margin-right:auto">Elimina scheda</button>':'')+'<button type="button" class="btn ghost" data-close>Chiudi</button><button class="btn" type="submit">Salva</button></div>'
    +'<div id="cd-conf"></div>'+callsH+'<div class="hist-mini"><span class="lbl">Storia della scheda</span><ul class="tl">'+histH+'</ul></div></form>',
   ov=>{
     bindSrcPicker(ov,'cd');
-    const save=async()=>{const n=tidy(ov.querySelector('#cd-n').value)||c.name,note=ov.querySelector('#cd-note').value.trim();
+    let noteV=c.noteText||'', noteSaved=noteV;
+    const saveNote=async()=>{const note=noteV.trim();if(note===(noteSaved||'').trim())return;noteSaved=note;
+      if(K==='dir')await put('cards',c.key,{...S.cards[c.key],note});
+      else await put('cards',c.metaId||uid('l'),{...(S.cards[c.metaId]||{}),kind:'lead',key:c.key,name:(S.cards[c.metaId]||{}).name||c.name,note,noteT:Date.now()});
+      toast('Nota salvata.')};
+    const nbox=ov.querySelector('#cd-nbox');
+    const showNote=()=>{nbox.innerHTML='<div class="nview" id="cd-nview" role="button" tabindex="0" aria-labelledby="cd-nl" title="Tocca per modificare">'+(noteV.trim()?esc(noteV):'<span class="ph">Tocca per aggiungere una nota…</span>')+'</div>';
+      const v=nbox.querySelector('#cd-nview'),go=()=>editNote();v.onclick=go;v.onkeydown=e=>{if(e.key==='Enter'||e.key===' '){e.preventDefault();go()}}};
+    const editNote=()=>{nbox.innerHTML='<textarea id="cd-note" aria-labelledby="cd-nl" placeholder="Scrivi qui le note del lead"></textarea>';const t=nbox.querySelector('#cd-note');t.value=noteV;
+      t.style.height='auto';t.style.height=Math.max(120,t.scrollHeight+4)+'px';t.focus();t.setSelectionRange(t.value.length,t.value.length);
+      t.oninput=()=>{noteV=t.value;t.style.height='auto';t.style.height=Math.max(120,t.scrollHeight+4)+'px'};
+      t.onkeydown=e=>{if(e.key==='Escape'){e.stopPropagation();t.onblur=null;noteV=noteSaved;showNote()}};
+      t.onblur=async()=>{noteV=t.value;showNote();await saveNote()}};
+    showNote();
+    const save=async()=>{const n=tidy(ov.querySelector('#cd-n').value)||c.name;
       const sv=K==='lead'?readSrc(ov,'cd'):null, sch=sv!=null&&canonSrc(sv)!==(c.src||'');
-      if(n===c.name&&note===(c.note||'')&&!sch)return;
-      if(K==='dir')await put('cards',c.key,{...S.cards[c.key],name:n,note});
-      else{const m={...(S.cards[c.metaId]||{}),kind:'lead',key:c.key,name:n,note};if(sch){m.src=canonSrc(sv);m.srcT=Date.now();if(m.src)await addSource(m.src)}await put('cards',c.metaId||uid('l'),m)}};
+      const t=ov.querySelector('#cd-note');if(t)noteV=t.value;
+      const noteCh=noteV.trim()!==(noteSaved||'').trim(), note=noteV.trim();
+      if(n===c.name&&!sch&&!noteCh)return;
+      if(K==='dir')await put('cards',c.key,{...S.cards[c.key],name:n,note:noteCh?note:(S.cards[c.key]||{}).note});
+      else{const m={...(S.cards[c.metaId]||{}),kind:'lead',key:c.key,name:n};if(noteCh){m.note=note;m.noteT=Date.now()}if(sch){m.src=canonSrc(sv);m.srcT=Date.now();if(m.src)await addSource(m.src)}await put('cards',c.metaId||uid('l'),m)}};
     ov.querySelector('#cd-f').onsubmit=async e=>{e.preventDefault();const to=ov.querySelector('#cd-st').value;closeSheet();await save();
       if(to!==c.stage){const nc=engine().cards[id];if(nc)moveCard(nc,to)}else toast('Scheda salvata.')};
     ov.querySelectorAll('[data-delmove]').forEach(b=>b.onclick=async()=>{closeSheet();await del('moves',b.dataset.delmove);toast('Spostamento annullato.')});
@@ -1393,29 +1434,29 @@ function openItem(id,i){
 
 /* ---------- modifica di una chiamata (in sessione e nel registro) ---------- */
 const OPT={
-  risposto:[[true,'Risposto','ok'],[false,'Non risposto','ko']],
+  risposto:[[true,'Risposto','ok'],[false,'Non risposto','ko'],['numko','Numero non valido','ko'],['doppio','Doppio','ko']],
   interessato:[[true,'Interessato','ok'],[false,'Non interessato','ko'],[null,'Non chiesto','']],
   esito:[['valido','Valido','ok'],['non_valido','Non valido','ko'],['posticipato','Posticipato',''],['da_validare','Da validare',''],[null,'Nessuno','']],
   permuta:[['nessuna','Nessuna',''],['valida','Valida','ok'],['non_valida','Non valida','ko'],['da_valutare','Da valutare',''],[null,'Non chiesto','']],
   ricerca:[['confermata','Confermata','ok'],['risentire','Da risentire',''],[null,'Non chiesto','']]};
 function cleanCall(o){
-  if(!o.risposto){o.interessato=null;o.esito=null}
+  if(o.risposto!==true){o.interessato=null;o.esito=null}
   if(o.interessato===false&&o.esito&&o.esito!=='posticipato')o.esito=null;
   if(o.esito!=='valido'){o.permuta=null;o.ricerca=null}
   const ns=negSysOf(o);if(!ns){o.reason='';o.rnote=''}
   return o;
 }
-const negSysOf=o=>!o.risposto?null:o.esito==='non_valido'?'nonval':(o.interessato===false&&!o.esito)?'nonint':(o.esito==='valido'&&o.permuta==='non_valida')?'permko':null;
+const negSysOf=o=>(o.numko||o.risposto==='numko')?'numko':(o.doppio||o.risposto==='doppio')?'doppio':!o.risposto?null:o.esito==='non_valido'?'nonval':(o.interessato===false&&!o.esito)?'nonint':(o.esito==='valido'&&o.permuta==='non_valida')?'permko':null;
 function editItem(it,{date,save,remove}){
-  let o=JSON.parse(JSON.stringify(it));
+  let o=JSON.parse(JSON.stringify(it));if(o.numko)o.risposto='numko';if(o.doppio)o.risposto='doppio';delete o.numko;delete o.doppio;
   const grp=(k,lbl,opts)=>'<div class="f"><span class="lbl">'+lbl+'</span><div class="chs" role="group" aria-label="'+lbl+'">'+opts.map(([v,l,c])=>'<button type="button" class="ch '+c+'" data-k="'+k+'" data-v="'+JSON.stringify(v).replace(/"/g,'&quot;')+'" aria-pressed="'+((o[k]??null)===v)+'">'+l+'</button>').join('')+'</div></div>';
   const body=()=>{let h='<div class="stps"><div class="f"><label for="ie-name">Lead</label><input type="text" id="ie-name" value="'+esc(o.name||'')+'" placeholder="Nome e cognome" autocomplete="off"></div>'
       +'<div class="f"><label for="ie-time">Ora della chiamata</label><input type="time" id="ie-time" value="'+(o.t?hhmm(o.t):'')+'"></div></div>';
     h+=srcPickerHTML('ie',o.src);
     h+=grp('risposto','Risposta',OPT.risposto);
-    if(o.risposto){h+=grp('interessato','Interessato',OPT.interessato)+grp('esito','Esito',OPT.esito);if(o.esito==='valido')h+=grp('permuta','Permuta',OPT.permuta)+grp('ricerca','Ricerca',OPT.ricerca)}
+    if(o.risposto===true){h+=grp('interessato','Interessato',OPT.interessato)+grp('esito','Esito',OPT.esito);if(o.esito==='valido')h+=grp('permuta','Permuta',OPT.permuta)+grp('ricerca','Ricerca',OPT.ricerca)}
     const ns=negSysOf(o);
-    if(ns){const st=sysStage('lead',ns);h+='<div class="f negf"><span class="lbl">Motivo ('+esc(st?st.name:'')+')</span><div class="chs">'+reasonsOf('lead',ns).concat(['Altro']).map(r=>'<button type="button" class="ch" data-k="reason" data-v="'+esc(JSON.stringify(r))+'" aria-pressed="'+(o.reason===r)+'">'+esc(r)+'</button>').join('')+'</div>'
+    if(ns){const st=sysStage('lead',ns);h+='<div class="f negf"><span class="lbl">Motivo ('+esc(st?st.name:'')+')</span><div class="chs">'+reasonsOf('lead',st?st.id:ns).concat(['Altro']).map(r=>'<button type="button" class="ch" data-k="reason" data-v="'+esc(JSON.stringify(r))+'" aria-pressed="'+(o.reason===r)+'">'+esc(r)+'</button>').join('')+'</div>'
       +'<input type="text" id="ie-rnote" value="'+esc(o.rnote||'')+'" placeholder="Dettagli sul motivo (facoltativo)" autocomplete="off"></div>'}
     h+=(o.esito==='posticipato'||o.esito==='da_validare'?'<div class="whenbox"><span class="lbl">Quando richiamare</span>'+whenPicker('ie-w',o.remind)+'</div>':'<div class="f"><label for="ie-when">Quando richiamare <span class="opt">(facoltativo)</span></label><input type="text" id="ie-when" value="'+esc(o.quando||'')+'" placeholder="Es. lunedì alle 10" autocomplete="off"></div>')
       +'<div class="f"><label for="ie-note">Note</label><textarea id="ie-note" placeholder="Nessuna nota">'+esc(o.note||'')+'</textarea></div>';
@@ -1429,12 +1470,12 @@ function editItem(it,{date,save,remove}){
   ov=>{
     ov.querySelector('#ie-body').addEventListener('click',e=>{const b=e.target.closest('[data-k]');if(!b)return;read(ov);o[b.dataset.k]=JSON.parse(b.dataset.v);cleanCall(o);ov.querySelector('#ie-body').innerHTML=body();bindSrcPicker(ov,'ie')});
     bindSrcPicker(ov,'ie');
-    ov.querySelector('#ie-f').onsubmit=async e=>{e.preventDefault();read(ov);
+    ov.querySelector('#ie-f').onsubmit=async e=>{e.preventDefault();read(ov);const isNum=o.risposto==='numko',isDop=o.risposto==='doppio';
       if(!o.name){toast('Il nome del lead serve per riconoscerlo quando lo richiami.');ov.querySelector('#ie-name').focus();return}
       cleanCall(o);if(negSysOf(o)&&!o.reason){toast('Scegli il motivo.');return}
       if(normName(o.name)!==normName(it.name)&&!(o.lid||'').startsWith('u:'))o.lid=null;
       o.src=canonSrc(o.src);if(o.src)await addSource(o.src);
-      closeSheet();await save(o)};
+      closeSheet();delete o.numko;delete o.doppio;if(isNum){o.risposto=false;o.numko=true}if(isDop){o.risposto=false;o.doppio=true}await save(o)};
     const d=ov.querySelector('#ie-del');if(d)d.onclick=()=>{const c=ov.querySelector('#ie-conf');c.innerHTML='<div class="conf"><span>Eliminare questa chiamata? Pipeline e numeri si aggiornano da soli.</span><span class="row-end"><button type="button" class="btn ghost" id="ie-n">No</button><button type="button" class="btn ko" id="ie-y">Sì, elimina</button></span></div>';
       c.querySelector('#ie-n').onclick=()=>{c.innerHTML=''};c.querySelector('#ie-y').onclick=async()=>{closeSheet();await remove()}};
   });
@@ -1771,7 +1812,7 @@ function leadCounts(items){const c={contattati:0,risposti:0,interessati:0,validi
     if(negSysOf(i))c.neg++;if(i.ricerca==='confermata')c.ricerche++});return c}
 const ESITO={valido:'Valido',non_valido:'Non valido',remarketing:'Remarketing',posticipato:'Posticipato',da_validare:'Da validare'};
 function callTrail(c){const t=[];
-  if(c.risposto===false)t.push(['Non risposto','ko']);
+  if(c.numko)t.push(['Numero non valido','ko']);else if(c.doppio)t.push(['Doppio','ko']);else if(c.risposto===false)t.push(['Non risposto','ko']);
   if(c.risposto)t.push(['Risposto','ok']);
   if(c.interessato===true)t.push(['Interessato','ok']);if(c.interessato===false)t.push(['Non interessato','ko']);
   if(c.esito)t.push([ESITO[c.esito],c.esito==='valido'?'ok':c.esito==='non_valido'?'ko':'on']);
@@ -1850,7 +1891,8 @@ function callCard(){
   if(c.step!=='start'&&c.step!=='done')h+=chips(callTrail(c));
   if(c.step==='start'){
     h+='<div class="f"><label for="c-name">Nome del lead</label><input type="text" id="c-name" placeholder="Nome e cognome" value="'+esc(c.name)+'" autocomplete="off"></div><div id="c-match">'+matchHTML(c)+'</div><div id="c-srcbox">'+srcPickerHTML('c',c.src)+'</div>'
-      +'<div class="btns"><button class="btn ok big" data-a="risposto">Risposto</button><button class="btn ko big" data-a="nonrisposto">Non risposto</button></div>';
+      +'<div class="btns"><button class="btn ok big" data-a="risposto">Risposto</button><button class="btn ko big" data-a="nonrisposto">Non risposto</button></div>'
+      +'<div class="btns"><button class="btn ghost big numko" data-a="numko">Numero non valido<small>errato o inesistente</small></button><button class="btn ghost big numko" data-a="doppio">Doppio<small>lead già arrivato prima</small></button></div>';
   } else if(c.step==='answered'){
     h+='<div class="q">Il lead è interessato?</div><div class="btns"><button class="btn ok big" data-a="int">Interessato</button><button class="btn ko big" data-a="noint">Non interessato</button></div>'
       +'<button class="btn dark big" data-a="post">Posticipato<small>scegli giorno e ora del richiamo</small></button>';
@@ -1910,7 +1952,7 @@ function bindSession(){
   el.querySelectorAll('[data-note]').forEach(t=>t.oninput=()=>{SS.items[+t.dataset.note].note=t.value;saveDraft()});
   el.querySelectorAll('[data-edit2]').forEach(b=>b.onclick=()=>editSessionItem(+b.dataset.edit2));
 }
-const callItem=c=>({src:canonSrc(c.src),remind:c.remind||null,name:tidy(c.name),lid:c.lid||null,risposto:c.risposto,interessato:c.interessato??null,esito:c.esito||null,quando:(c.quando||'').trim(),permuta:c.permuta||null,ricerca:c.ricerca||null,reason:c.reason||'',rnote:c.rnote||'',note:(c.note||'').trim(),t:c.t||Date.now()});
+const callItem=c=>({numko:!!c.numko,doppio:!!c.doppio,src:canonSrc(c.src),remind:c.remind||null,name:tidy(c.name),lid:c.lid||null,risposto:c.risposto,interessato:c.interessato??null,esito:c.esito||null,quando:(c.quando||'').trim(),permuta:c.permuta||null,ricerca:c.ricerca||null,reason:c.reason||'',rnote:c.rnote||'',note:(c.note||'').trim(),t:c.t||Date.now()});
 function askReason(c,sys,then){const st=sysStage('lead',sys);if(!st){then();return}
   reasonSheet('lead',st,c.name,null,(reason,rnote)=>{c.reason=reason;c.rnote=rnote;then();saveDraft();renderSession()})}
 function act(a){
@@ -1918,11 +1960,16 @@ function act(a){
   const finishCall=()=>{c.t=c.t||Date.now();const item=callItem(c);if(c.idx!=null)SS.items[c.idx]=item;else{SS.items.push(item);c.idx=SS.items.length-1}};
   const nt=$('#c-note');if(nt)c.note=nt.value;
   const nm=$('#c-name');if(nm)c.name=nm.value;
-  if((a==='risposto'||a==='nonrisposto')&&!tidy(c.name)){toast('Scrivi il nome del lead: serve per riconoscerlo quando lo richiami.');nm&&nm.focus();return}
-  if(a==='risposto'||a==='nonrisposto'){const sv=readSrc($('.sess'),'c');if(sv!=null)c.src=sv;
+  if((a==='risposto'||a==='nonrisposto'||a==='numko'||a==='doppio')&&!tidy(c.name)){toast('Scrivi il nome del lead: serve per riconoscerlo quando lo richiami.');nm&&nm.focus();return}
+  if(a==='risposto'||a==='nonrisposto'||a==='numko'||a==='doppio'){const sv=readSrc($('.sess'),'c');if(sv!=null)c.src=sv;
     if(!tidy(c.src)){toast('Scegli da dove arriva il lead, o scrivi una nuova fonte.');const i=$('#c-src');i&&i.focus();return}
     c.src=canonSrc(c.src);addSource(c.src)}
   switch(a){
+    case 'doppio':{ // scheda separata: il lead originale con lo stesso nome non viene toccato
+      const st=sysStage('lead','doppio');
+      askReason(c,'doppio',()=>{c.name=tidy(c.name);if(!(c.lid||'').startsWith('u:')&&knownOf(c))c.lid='u:'+uid('');c.risposto=false;c.doppio=true;c.interessato=null;c.esito=null;c.t=Date.now();c.step='done';finishCall();
+        if(st&&!st.sys&&S.settings.pipes&&S.settings.pipes.lead)put('settings','main',{...S.settings,pipes:{...S.settings.pipes,lead:S.settings.pipes.lead.map(x=>x.id===st.id?{...x,sys:'doppio'}:x)}})});return}
+    case 'numko':askReason(c,'numko',()=>{c.name=tidy(c.name);c.risposto=false;c.numko=true;c.interessato=null;c.esito=null;c.t=Date.now();c.step='done';finishCall()});return;
     case 'risposto':c.name=tidy(c.name);c.risposto=true;c.t=Date.now();c.step='answered';break;
     case 'nonrisposto':{c.name=tidy(c.name);c.risposto=false;c.t=Date.now();finishCall();const k=leadKey(SS.items[c.idx]),st=stageOf('lead',liveStage(k));SS.cur=newCall();
       toast('Non risposto: '+c.name+(st?' → '+st.name:'')+'.',()=>{SS.items.pop();saveDraft();renderSession()});break}
