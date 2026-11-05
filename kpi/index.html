@@ -231,7 +231,7 @@ details.more[open] summary{margin-bottom:8px}
 .sess-top .end{background:var(--orange);color:#fff;border:0;padding:10px 16px;font-family:var(--f-label);font-weight:800;font-size:13px}
 .sess-body{display:grid;grid-template-columns:minmax(0,1.25fr) minmax(0,1fr);gap:18px;padding-block:18px 40px;align-items:start}
 @media (max-width:860px){.sess-body{grid-template-columns:1fr}}
-.cnt{display:grid;grid-template-columns:repeat(5,1fr);background:var(--surface)}
+.cnt{display:grid;grid-template-columns:repeat(4,1fr);background:var(--surface)}
 .cnt.three{grid-template-columns:repeat(3,1fr)}
 .cnt.four{grid-template-columns:repeat(4,1fr)}
 .cnt div{padding:12px 10px;text-align:center;border-right:1px solid var(--line);min-width:0}
@@ -563,7 +563,7 @@ const REASONS_DEF={
  ricko:['Auto introvabile','Budget non realistico','Requisiti troppo specifici','Tempi di consegna troppo lunghi'],
  offko:['Prezzo troppo alto','Ha trovato altrove','Ci ha ripensato','Auto non convincente','Tempi di consegna'],
  leako:['Finanziamento non approvato','Rata troppo alta','Anticipo troppo alto','Durata non adatta']};
-const LVL_LBL=['Prima della validazione','Valido','Ricerca','Offerta','Leasing','Chiusura'];
+const LVL_LBL=['Prima della validazione','Interessato','Ricerca (valido)','Offerta','Leasing','Chiusura'];
 const KIND_LBL={lead:'Lead',dir:'Contatti diretti'};
 const DEF_SET={pctOnline:18,pctDiretta:15,goal:0,sabato:false,callsDay:0,sources:[]};
 const stagesOf=kind=>{const L=(S.settings.pipes&&S.settings.pipes[kind]&&S.settings.pipes[kind].length?S.settings.pipes[kind]:STAGE_DEF[kind]);
@@ -666,8 +666,8 @@ function engine(){
   const setStage=(c,to,e,info)=>{const st=stageOf(c.kind,to);if(!st)return;
     c.stage=to;c.stageT=e.t;c.stageDate=e.date;c.hist.push({t:e.t,date:e.date,to,...info});
     if(c.kind==='lead'&&!tryNum(st)&&st.sys!=='mai'&&st.sys!=='numko'&&!isSysStage('lead',st.id,'doppio'))mark(c,'risp',e.date);
-    if(st.lvl>=1){mark(c,'int',e.date);mark(c,'valid',e.date)}
-    if(st.lvl>=2)mark(c,'ric',e.date); if(st.lvl>=3)mark(c,'off',e.date); if(st.lvl===4)mark(c,'lea',e.date);
+    if(st.lvl>=1)mark(c,'int',e.date);
+    if(st.lvl>=2){mark(c,'valid',e.date);mark(c,'ric',e.date)} if(st.lvl>=3)mark(c,'off',e.date); if(st.lvl===4)mark(c,'lea',e.date);
     c.maxLvl=Math.max(c.maxLvl,st.lvl);
     c.neg=st.neg?{stage:to,date:e.date,t:e.t,reason:info.reason||'',rnote:info.rnote||'',mid:info.mid||null}:null;
     if(st.sys!=='post'){c.remind=null;c.remindLbl=''}else if(info.remind!==undefined){c.remind=info.remind||null;c.remindLbl=info.quando||''}
@@ -872,8 +872,8 @@ function ptDelta(r,pr){
 
 /* ---------- funnel ---------- */
 const FUN={
-  lead:st=>[['Chiamate fatte',st.L.contattati],['Lead nuovi',st.L.nuovi],['Risposte',st.L.risposti,1],['Interessati',st.L.interessati,2],['Validi',st.L.validi,3],['Ricerche',st.L.ricerche,4],['Offerte',st.L.proposte,5],['Leasing',st.L.trattative,6],['Chiusure',st.L.chiusure,6]],
-  dir:st=>[['Contatti diretti',st.D.nuovi],['Validi',st.D.valid,0],['Ricerche',st.D.ric,1],['Offerte',st.D.off,2],['Leasing',st.D.lea,3],['Chiusure',st.D.chiusure,3]]};
+  lead:st=>[['Chiamate fatte',st.L.contattati],['Lead nuovi',st.L.nuovi],['Risposte',st.L.risposti,1],['Interessati',st.L.interessati,2],['Validi',st.L.validi,3],['Offerte',st.L.proposte,4],['Leasing',st.L.trattative,5],['Chiusure',st.L.chiusure,5]],
+  dir:st=>[['Contatti diretti',st.D.nuovi],['Validi',st.D.valid,0],['Offerte',st.D.off,1],['Leasing',st.D.lea,2],['Chiusure',st.D.chiusure,2]]};
 function funnelHTML(rows,prevRows,kind){
   const max=Math.max(rows[0][1],1), tb=rows.findIndex(r=>r[0]==='Lead nuovi'||r[0]==='Contatti diretti'), tl=kind==='dir'?'dei contatti':'dei lead';
   return '<div class="fun">'+rows.map((r,i)=>{const b=r[2], base=b!=null?rows[b]:null;
@@ -887,13 +887,11 @@ function funnelHTML(rows,prevRows,kind){
 const STEPS={
  lead:[['risposti','nuovi','Risposte sui lead nuovi','Prova fasce orarie diverse e richiama entro 24 ore chi non ha risposto.'],
   ['interessati','risposti','Interessati sulle risposte','Lavora sui primi 20 secondi: ricorda al lead cosa ha richiesto e perché lo chiami.'],
-  ['validi','interessati','Validi sugli interessati','Annota il motivo nei non validi: se si ripete, segnala le campagne da cui arrivano.'],
-  ['ricerche','validi','Ricerche sui validi','Chiudi la chiamata con un passo concreto: conferma la ricerca e fissa quando presenterai l\'offerta.'],
-  ['proposte','ricerche','Offerte sulle ricerche','Troppe ricerche non diventano offerta: rivedi budget e criteri con il cliente prima di cercare.'],
+  ['validi','interessati','Validi sugli interessati','Chiudi la chiamata con un passo concreto: conferma la ricerca. Annota il motivo nei non validi: se si ripete, segnala la campagna.'],
+  ['proposte','validi','Offerte sui validi','Troppe ricerche non diventano offerta: rivedi budget e criteri con il cliente prima di cercare.'],
   ['chiusure','proposte','Chiusure sulle offerte','Presenta l\'offerta in videochiamata e fissa subito una data di decisione.']],
- dir:[['valid','nuovi','Validi sui contatti','Qualifica subito budget, permuta e solvibilità: risparmi tempo sui contatti che non chiudono.'],
-  ['ric','valid','Ricerche sui validi','Fissa la ricerca durante il primo incontro, finché il cliente è caldo.'],
-  ['off','ric','Offerte sulle ricerche','Manda l\'offerta entro 48 ore dalla ricerca: dopo, l\'interesse cala.'],
+ dir:[['valid','nuovi','Validi sui contatti','Qualifica subito budget, permuta e solvibilità e fissa la ricerca durante il primo incontro, finché il cliente è caldo.'],
+  ['off','valid','Offerte sui validi','Manda l\'offerta entro 48 ore dalla ricerca: dopo, l\'interesse cala.'],
   ['chiusure','off','Chiusure sulle offerte','Richiama ogni offerta entro 2 giorni e chiedi cosa manca per decidere.']]};
 function weakest(steps,cur,prev){
   const c=steps.map(([to,from,label,tip])=>({label,tip,from:cur[from],to:cur[to],r:cur[from]?cur[to]/cur[from]:null,pr:prev&&prev[from]>=5?prev[to]/prev[from]:null})).filter(x=>x.from>=5);
@@ -1018,12 +1016,12 @@ function renderDash(kind){
   if(kind==='lead')h+='<section class="tiles">'
     +'<div class="tile"><span class="eyebrow">Chiamate fatte</span><span class="v num">'+stF.L.contattati+'</span><span class="s">'+stF.L.risposti+' '+pl(stF.L.risposti,'risposta','risposte')+' ('+pct(stF.L.risposti,stF.L.nuovi)+' dei lead)'+(stF.L.numko?' · '+stF.L.numko+' '+pl(stF.L.numko,'numero non valido','numeri non validi'):'')+(stF.L.doppi?' · '+stF.L.doppi+' '+pl(stF.L.doppi,'doppio','doppi'):'')+'</span>'+delta(stF.L.contattati,pv.L.contattati,vs)+'</div>'
     +'<div class="tile"><span class="eyebrow">Validi</span><span class="v num">'+stF.L.validi+'</span><span class="s">'+pct(stF.L.validi,stF.L.nuovi)+' di '+stF.L.nuovi+' '+pl(stF.L.nuovi,'lead nuovo','lead nuovi')+'</span>'+delta(stF.L.validi,pv.L.validi,vs)+'</div>'
-    +'<div class="tile"><span class="eyebrow">Offerte</span><span class="v num">'+stF.L.proposte+'</span><span class="s">'+pct(stF.L.proposte,stF.L.nuovi)+' dei lead · '+stF.L.ricerche+' '+pl(stF.L.ricerche,'ricerca','ricerche')+'</span>'+delta(stF.L.proposte,pv.L.proposte,vs)+'</div>'
+    +'<div class="tile"><span class="eyebrow">Offerte</span><span class="v num">'+stF.L.proposte+'</span><span class="s">'+pct(stF.L.proposte,stF.L.nuovi)+' dei lead · '+pct(stF.L.proposte,stF.L.validi)+' dei validi</span>'+delta(stF.L.proposte,pv.L.proposte,vs)+'</div>'
     +'<div class="tile"><span class="eyebrow">Chiusure lead</span><span class="v num">'+stF.L.chiusure+'</span><span class="s">'+pct(stF.L.chiusure,stF.L.nuovi)+' dei lead · '+chf(stF.mL)+' di margine</span>'+delta(stF.L.chiusure,pv.L.chiusure,vs)+'</div></section>';
   else h+='<section class="tiles">'
     +'<div class="tile"><span class="eyebrow">Contatti diretti</span><span class="v num">'+stF.D.nuovi+'</span><span class="s">nuovi nel mese</span>'+delta(stF.D.nuovi,pv.D.nuovi,vs)+'</div>'
     +'<div class="tile"><span class="eyebrow">Validi</span><span class="v num">'+stF.D.valid+'</span><span class="s">'+pct(stF.D.valid,stF.D.nuovi)+' dei contatti</span>'+delta(stF.D.valid,pv.D.valid,vs)+'</div>'
-    +'<div class="tile"><span class="eyebrow">Offerte</span><span class="v num">'+stF.D.off+'</span><span class="s">'+stF.D.ric+' '+pl(stF.D.ric,'ricerca','ricerche')+' · '+stF.D.lea+' leasing</span>'+delta(stF.D.off,pv.D.off,vs)+'</div>'
+    +'<div class="tile"><span class="eyebrow">Offerte</span><span class="v num">'+stF.D.off+'</span><span class="s">'+pct(stF.D.off,stF.D.valid)+' dei validi · '+stF.D.lea+' leasing</span>'+delta(stF.D.off,pv.D.off,vs)+'</div>'
     +'<div class="tile"><span class="eyebrow">Chiusure</span><span class="v num">'+stF.D.chiusure+'</span><span class="s">'+chf(stF.mD)+' di margine</span>'+delta(stF.D.chiusure,pv.D.chiusure,vs)+'</div></section>';
   h+='<section class="card"><div class="card-h"><h2>Aggiornamento del mese</h2><span class="note">Calcolato sui tuoi dati</span></div><div class="ins">'
     +insights(kind,st).map(([t,x])=>'<article><span class="eyebrow">'+t+'</span><p>'+esc(x)+'</p></article>').join('')+'</div></section>';
@@ -1376,8 +1374,8 @@ function renderReminders(){
 setInterval(renderReminders,30000);
 
 /* ---------- storico lead ---------- */
-const LCOLS=[['contattati','Chiamate'],['risposti','Risposte'],['interessati','Interessati'],['validi','Validi'],['ricerche','Ricerche'],['proposte','Offerte'],['trattative','Leasing']];
-const DCOLS=[['nuovi','Contatti'],['valid','Validi'],['ric','Ricerche'],['off','Offerte'],['lea','Leasing']];
+const LCOLS=[['contattati','Chiamate'],['risposti','Risposte'],['interessati','Interessati'],['validi','Validi'],['proposte','Offerte'],['trattative','Leasing']];
+const DCOLS=[['nuovi','Contatti'],['valid','Validi'],['off','Offerte'],['lea','Leasing']];
 function dayTable(kind,st){
   const cols=kind==='lead'?LCOLS:DCOLS, sales=d=>st.sales.filter(s=>s.kind===kind&&s.date===d).length;
   const rows=allDates().filter(d=>ymOf(d)===ym).map(d=>({d,v:kind==='lead'?dayLead(d):dayDir(d)})).filter(x=>Object.values(x.v).some(n=>n>0)||sales(x.d)).reverse();
@@ -1417,7 +1415,7 @@ function renderHistD(){
   h+='<section class="card"><div class="card-h"><h2>Chiusure contatti diretti</h2><span class="note">'+chf(st.mD)+' di margine</span></div>'+(sl.length?sl.map(saleRow).join(''):'<div class="empty">Nessuna chiusura in '+monthName(ym)+'.</div>')+'</section>';
   return h;
 }
-function sessLine(s){const it=s.items||[],n=it.length,r=it.filter(i=>i.risposto).length,v=it.filter(i=>i.esito==='valido').length;
+function sessLine(s){const it=s.items||[],n=it.length,lc=leadCounts(it),r=lc.risposti,v=lc.validi;
   return n+' '+pl(n,'chiamata','chiamate')+', '+r+' '+pl(r,'risposta','risposte')+', '+v+' '+pl(v,'valido','validi')}
 const sEnd=s=>s.endedAt||(s.startedAt+(s.durationMs||0));
 
@@ -1728,7 +1726,8 @@ function renderSet(){
    +srcEditorHTML()+pipeEditorHTML('lead')+reasonsHTML('lead')+pipeEditorHTML('dir')+reasonsHTML('dir')
    +'<section class="card"><div class="card-h"><h2>Come si calcola</h2></div><div class="howto">'
    +'<p><b>Guadagno:</b> '+s.pctOnline+'% sul margine delle chiusure da lead e '+s.pctDiretta+'% su quelle dei contatti diretti, sommati nello stesso obiettivo.</p>'
-   +'<p><b>Conteggi:</b> ogni scheda conta una volta per fase, nel giorno in cui ci arriva. Una scheda spostata più avanti conta anche le fasi saltate (valido, ricerca, offerta); il leasing conta solo se la scheda passa da una fase leasing.</p>'
+   +'<p><b>Conteggi:</b> ogni scheda conta una volta per fase, nel giorno in cui ci arriva. Una scheda spostata più avanti conta anche le fasi saltate; il leasing conta solo se la scheda passa da una fase leasing.</p>'
+   +'<p><b>Validi:</b> un lead è valido solo quando arriva in Ricerca o in una fase successiva (Offerta, Leasing, Chiusura). Conta una volta sola, anche se poi cambia fase più volte. Valutazione permuta conta come interessato.</p>'
    +'<p><b>Lead:</b> ogni chiamata senza risposta sposta la scheda da X1 a X5; quella dopo la porta in Mai risposto, dove resta. Posticipato, Non interessato, Non valido, Valido, Permuta non valida e Ricerca confermata spostano la scheda da soli. Offerta, Leasing e Chiusura le sposti tu.</p>'
    +'<p><b>Fasi negative:</b> chiedono il motivo e mandano la scheda in Non conclusi, da dove puoi riaprirla.</p></div></section>';
 }
@@ -1841,9 +1840,10 @@ function openSession(){
   clearInterval(tick);tick=setInterval(()=>{if(checkIdle()){renderSession();return}const t=$('#timer');if(t)t.textContent=dur(elapsed())},1000);
 }
 function closeSession(){clearInterval(tick);const el=$('.sess');if(el)el.remove();document.body.style.overflow='';SS=null;renderView()}
-function leadCounts(items){const c={contattati:0,risposti:0,interessati:0,validi:0,ricerche:0,post:0,daValidare:0,neg:0};
-  items.forEach(i=>{c.contattati++;if(i.risposto)c.risposti++;if(i.interessato)c.interessati++;if(i.esito==='valido')c.validi++;if(i.esito==='posticipato')c.post++;if(i.esito==='da_validare')c.daValidare++;
-    if(negSysOf(i))c.neg++;if(i.ricerca==='confermata')c.ricerche++});return c}
+function leadCounts(items){const c={contattati:0,risposti:0,interessati:0,validi:0,ricerche:0,post:0,daValidare:0,neg:0}, U={risposti:new Set(),interessati:new Set(),validi:new Set()};
+  items.forEach((i,k)=>{const key=leadKey(i)||'#'+k;c.contattati++;if(i.risposto)U.risposti.add(key);if(i.interessato)U.interessati.add(key);if(i.ricerca==='confermata')U.validi.add(key); // valido = ricerca confermata, una volta per lead
+    if(i.esito==='posticipato')c.post++;if(i.esito==='da_validare')c.daValidare++;if(negSysOf(i))c.neg++});
+  c.risposti=U.risposti.size;c.interessati=U.interessati.size;c.validi=c.ricerche=U.validi.size;return c}
 const ESITO={valido:'Valido',non_valido:'Non valido',remarketing:'Remarketing',posticipato:'Posticipato',da_validare:'Da validare'};
 function callTrail(c){const t=[];
   if(c.numko)t.push(['Numero non valido','ko']);else if(c.doppio)t.push(['Doppio','ko']);else if(c.risposto===false)t.push(['Non risposto','ko']);
@@ -1902,7 +1902,7 @@ function renderSession(){
   if(SS.phase==='summary'){h+=sessionSummary(SS,true)+'</div>';el.innerHTML=h;bindSession();return}
   if(SS.autoStop&&!SS.runFrom)h+='<div class="idle"><span>Timer fermato alle '+hhmm(SS.autoStop)+' dopo 30 minuti senza attività. Il tempo inattivo non è stato contato.</span><button class="btn" id="idle-go">Riprendi</button></div>';
   h+='<div class="sess-body"><div style="display:flex;flex-direction:column;gap:14px;min-width:0">';
-  h+='<div class="cnt num"><div><b>'+c.contattati+'</b><span>Chiamate</span></div><div><b>'+c.risposti+'</b><span>Risposte</span></div><div><b>'+c.interessati+'</b><span>Interessati</span></div><div><b>'+c.validi+'</b><span>Validi</span></div><div><b>'+c.ricerche+'</b><span>Ricerche</span></div></div>';
+  h+='<div class="cnt num"><div><b>'+c.contattati+'</b><span>Chiamate</span></div><div><b>'+c.risposti+'</b><span>Risposte</span></div><div><b>'+c.interessati+'</b><span>Interessati</span></div><div><b>'+c.validi+'</b><span>Validi</span></div></div>';
   h+=callCard();
   h+='</div><aside class="log"><h3>Chiamate della sessione</h3>';
   if(!SS.items.length)h+='<div class="empty" style="margin-top:8px">Qui compaiono le chiamate concluse: puoi modificarle in qualsiasi momento.</div>';
@@ -2052,8 +2052,8 @@ function sessionSummary(s,live){
   h+='<dl class="sumbox num"><div><dt>Durata</dt><dd>'+durWords(ms)+' (dalle '+hhmm(s.startedAt)+(s.endedAt?' alle '+hhmm(s.endedAt):'')+')'
     +(live?'<label class="fixdur">Correggi in minuti <input type="number" id="ss-min" min="0" step="1" inputmode="numeric" value="'+Math.round(ms/60000)+'"></label>':'')+'</dd></div>';
   h+='<div><dt>Chiamate</dt><dd>'+c.contattati+(rc?' · '+rc+' '+pl(rc,'lead richiamato','lead richiamati'):'')+'</dd></div><div><dt>Risposte</dt><dd>'+c.risposti+' ('+pct(c.risposti,c.contattati)+')</dd></div>'
-   +'<div><dt>Interessati</dt><dd>'+c.interessati+' ('+pct(c.interessati,c.risposti)+' delle risposte)</dd></div><div><dt>Validi</dt><dd>'+c.validi+'</dd></div>'
-   +'<div><dt>Ricerche confermate</dt><dd>'+c.ricerche+'</dd></div><div><dt>Altri esiti</dt><dd>Posticipati '+c.post+' · Da validare '+c.daValidare+' · Non conclusi '+c.neg+'</dd></div>'
+   +'<div><dt>Interessati</dt><dd>'+c.interessati+' ('+pct(c.interessati,c.risposti)+' delle risposte)</dd></div><div><dt>Validi</dt><dd>'+c.validi+' (ricerca confermata)</dd></div>'
+   +'<div><dt>Altri esiti</dt><dd>Posticipati '+c.post+' · Da validare '+c.daValidare+' · Non conclusi '+c.neg+'</dd></div>'
    +(c.contattati&&ms>60000?'<div><dt>Ritmo</dt><dd>'+dec(c.contattati/(ms/3600000))+' chiamate all\'ora</dd></div>':'');
   h+='</dl>';
   if(live)h+='<p style="margin:0;font-size:13.5px;color:var(--muted)">Salvando, le chiamate entrano nel '+dmy(s.date)+' e le schede della pipeline si spostano da sole. I lead richiamati aggiornano la loro scheda senza essere contati due volte.</p>'
