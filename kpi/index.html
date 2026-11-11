@@ -450,6 +450,9 @@ select{background:var(--surface)}
 .newsrc{display:flex;flex-direction:column;gap:6px;margin-top:8px}
 .newsrc[hidden]{display:none}
 .btn.numko{color:var(--ko);border-color:var(--ko)}
+.goalt{display:flex;flex-direction:column;gap:8px}.goalt .gh,.goalt .gr{display:grid;grid-template-columns:minmax(0,1.2fr) minmax(0,1fr) minmax(0,1fr);gap:10px;align-items:center}
+.goalt .gh span{font-size:12px;font-weight:600;color:var(--muted)}.goalt .gr b{font-weight:600}.goalt .gr small{display:block;font-size:11px;font-weight:600;color:var(--orange)}.goalt input{min-width:0;width:100%}
+.band .lnk.band-l{color:inherit;margin-left:8px;font-size:inherit}
 [hidden]{display:none!important}
 .srct td small{display:block;font-size:11px;color:var(--muted);font-weight:500}.fun .r .tot{font-weight:600;color:var(--ink)}
 .srcrow select{flex:0 0 auto;width:auto;min-width:0}.srct tr.grp td{font-size:12px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--muted);background:var(--bg)}
@@ -565,7 +568,11 @@ const REASONS_DEF={
  leako:['Finanziamento non approvato','Rata troppo alta','Anticipo troppo alto','Durata non adatta']};
 const LVL_LBL=['Prima della validazione','Interessato','Ricerca (valido)','Offerta','Leasing','Chiusura'];
 const KIND_LBL={lead:'Lead',dir:'Contatti diretti'};
-const DEF_SET={pctOnline:18,pctDiretta:15,goal:0,sabato:false,callsDay:0,sources:[]};
+const DEF_SET={pctOnline:18,pctDiretta:15,goal:0,sabato:false,callsDay:0,sources:[],goals:{}};
+/* obiettivi: quello del mese se impostato, altrimenti lo standard */
+const goalRec=ym=>(S.settings.goals||{})[ym]||{};
+const goalOf=ym=>{const g=goalRec(ym).goal;return g!=null&&g!==''?+g:(+S.settings.goal||0)};
+const callsOf=ym=>{const g=goalRec(ym).callsDay;return g!=null&&g!==''?+g:(+S.settings.callsDay||0)};
 const stagesOf=kind=>{const L=(S.settings.pipes&&S.settings.pipes[kind]&&S.settings.pipes[kind].length?S.settings.pipes[kind]:STAGE_DEF[kind]);
   if(kind!=='lead')return L; // fasi salvate prima di "Numero non valido" o "Doppio": le aggiungo dopo Mai risposto
   const hasNum=L.some(s=>s.sys==='numko'), hasDop=L.some(s=>s.sys==='doppio'||normName(s.name)==='doppio');if(hasNum&&hasDop)return L;
@@ -921,9 +928,9 @@ function insights(kind,st){
     const nK=X.chiusure/p.el*p.tot;
     b=st.g>0?'Al ritmo attuale chiudi '+mn+' con circa '+chf(p.g)+' di guadagno totale (lead e contatti diretti).':'Per ora non ci sono chiusure: la proiezione parte dalla prima.';
     if(X.chiusure)b+=' Da '+(kind==='lead'?'lead':'contatti diretti')+' circa '+Math.round(nK)+' '+pl(Math.round(nK),'chiusura','chiusure')+'.';
-    if(set.goal>0){const gap=Math.max(set.goal-st.g,0);b+=p.g>=set.goal&&st.g>0?' Sei in linea con l\'obiettivo di '+chf(set.goal)+'.':' Per l\'obiettivo di '+chf(set.goal)+' mancano '+chf(gap)+'.'}
+    if(goalOf(st.ym)>0){const gap=Math.max(goalOf(st.ym)-st.g,0);b+=p.g>=goalOf(st.ym)&&st.g>0?' Sei in linea con l\'obiettivo di '+chf(goalOf(st.ym))+'.':' Per l\'obiettivo di '+chf(goalOf(st.ym))+' mancano '+chf(gap)+'.'}
     if(prev.g>0)b+=' '+cap(aM(monthName(prev.ym)))+' avevi guadagnato '+chf(prev.g)+'.';
-  } else if(st.ym<ymOf(today()))b=st.hasData?'Mese concluso con '+chf(st.g)+' di guadagno totale'+(set.goal>0?(st.g>=set.goal?': obiettivo raggiunto.':': ti sono mancati '+chf(set.goal-st.g)+'.'):'.'):'Mese senza dati registrati.';
+  } else if(st.ym<ymOf(today()))b=st.hasData?'Mese concluso con '+chf(st.g)+' di guadagno totale'+(goalOf(st.ym)>0?(st.g>=goalOf(st.ym)?': obiettivo raggiunto.':': ti sono mancati '+chf(goalOf(st.ym)-st.g)+'.'):'.'):'Mese senza dati registrati.';
   else b='La proiezione parte dal primo giorno lavorativo del mese.';
   out.push(['Proiezione',b]);
   const c=[], w=weakest(STEPS[kind],X,prev.hasData?PX:null);
@@ -948,7 +955,7 @@ function insights(kind,st){
 
 /* ---------- avvisi rossi: solo per i problemi seri ---------- */
 function callGoal(){
-  if(S.settings.callsDay>0)return {v:S.settings.callsDay,lbl:'il tuo obiettivo di'};
+  const cg=callsOf(ymOf(today()));if(cg>0)return {v:cg,lbl:'il tuo obiettivo di'};
   const pv=ymAdd(ymOf(today()),-1);let n=0,t=0;allDates().forEach(d=>{if(ymOf(d)!==pv)return;const c=dayLead(d).contattati;if(c>0){n++;t+=c}});
   return n>=5?{v:Math.round(t/n),lbl:'la tua media di '+monthName(pv)+':'}:{v:0,lbl:''};
 }
@@ -956,8 +963,8 @@ function alerts(kind,st){
   const out=[],set=S.settings;
   if(st.ym!==ymOf(today()))return out;
   const p=projection(st);if(!p||!st.hasData)return out;
-  if(set.goal>0&&p.el>=4){const pace=set.goal*p.el/p.tot,r=pace?st.g/pace:1;
-    if(r<0.6)out.push({k:'goal',t:'Sei lontano dall\'obiettivo del mese',x:'Sei a '+chf(st.g)+' (lead e contatti diretti), il '+Math.round(r*100)+'% del ritmo che serve oggi ('+chf(pace)+'). Di questo passo chiudi a circa '+chf(p.g)+' su '+chf(set.goal)+'.',
+  const G=goalOf(st.ym);if(G>0&&p.el>=4){const pace=G*p.el/p.tot,r=pace?st.g/pace:1;
+    if(r<0.6)out.push({k:'goal',t:'Sei lontano dall\'obiettivo del mese',x:'Sei a '+chf(st.g)+' (lead e contatti diretti), il '+Math.round(r*100)+'% del ritmo che serve oggi ('+chf(pace)+'). Di questo passo chiudi a circa '+chf(p.g)+' su '+chf(G)+'.',
       f:'parti dalle schede in offerta e leasing: sono le più vicine alla firma.'})}
   if(kind==='lead'){
     const recent=callLog(isoAdd(today(),-60),today()), best=bestHours(recent,8).list.slice(0,2).map(x=>'tra le '+hLbl(x.h));
@@ -984,16 +991,16 @@ const alertsHTML=(kind,st)=>{const d=lsGet(DISM)||{};return alerts(kind,st).filt
 
 /* ---------- dashboard ---------- */
 function bandHTML(st){
-  const p=projection(st), set=S.settings, goal=set.goal>0;let pill='';
-  if(goal&&p){const paceNow=set.goal*p.el/p.tot,diff=st.g-paceNow;pill=diff>=0?'<span class="pill up">▲ Avanti di '+chf(diff)+' sul ritmo</span>':'<span class="pill down">▼ Indietro di '+chf(-diff)+' sul ritmo</span>'}
-  else if(goal&&st.hasData&&st.ym<ymOf(today()))pill=st.g>=set.goal?'<span class="pill up">✓ Obiettivo raggiunto</span>':'<span class="pill down">✕ Obiettivo mancato di '+chf(set.goal-st.g)+'</span>';
+  const p=projection(st), set=S.settings, G=goalOf(st.ym), goal=G>0;let pill='';
+  if(goal&&p){const paceNow=G*p.el/p.tot,diff=st.g-paceNow;pill=diff>=0?'<span class="pill up">▲ Avanti di '+chf(diff)+' sul ritmo</span>':'<span class="pill down">▼ Indietro di '+chf(-diff)+' sul ritmo</span>'}
+  else if(goal&&st.hasData&&st.ym<ymOf(today()))pill=st.g>=G?'<span class="pill up">✓ Obiettivo raggiunto</span>':'<span class="pill down">✕ Obiettivo mancato di '+chf(G-st.g)+'</span>';
   return '<section class="band"><div><div class="eyebrow">Il tuo guadagno · '+monthLabel(st.ym)+'</div><div class="big num"><small>CHF</small>'+grp(st.g)+'</div>'
     +'<div class="sub">Lead '+chf(st.gL)+' ('+set.pctOnline+'%) · Contatti diretti '+chf(st.gD)+' ('+set.pctDiretta+'%)</div>'+(pill?'<div class="pillrow">'+pill+'</div>':'')+'</div>'
     +'<div class="proj">'
     +(p?'<div class="row"><span>Proiezione a fine mese</span><b class="num">'+chf(p.g)+'</b></div>':'<div class="row"><span>'+(st.ym<ymOf(today())?'Mese concluso':'Proiezione non disponibile')+'</span><b class="num">'+chf(st.g)+'</b></div>')
-    +(goal?'<div class="meter" role="img" aria-label="Avanzamento verso l\'obiettivo"><u style="left:0;width:'+Math.min(100,(p?p.g:st.g)/set.goal*100)+'%"></u><i style="width:'+Math.min(100,st.g/set.goal*100)+'%"></i></div>'
-       +'<div class="row"><span>Obiettivo '+chf(set.goal)+'</span><span class="num">'+Math.round(st.g/set.goal*100)+'% raggiunto</span></div>'
-      :'<div class="row"><span>Imposta un obiettivo mensile in Impostazioni per vedere l\'avanzamento.</span></div>')
+    +(goal?'<div class="meter" role="img" aria-label="Avanzamento verso l\'obiettivo"><u style="left:0;width:'+Math.min(100,(p?p.g:st.g)/G*100)+'%"></u><i style="width:'+Math.min(100,st.g/G*100)+'%"></i></div>'
+       +'<div class="row"><span>Obiettivo '+chf(G)+(goalRec(st.ym).goal!=null&&goalRec(st.ym).goal!==''?'':' (standard)')+' <button class="lnk band-l" data-goal="'+st.ym+'">Modifica</button></span><span class="num">'+Math.round(st.g/G*100)+'% raggiunto</span></div>'
+      :'<div class="row"><span>Nessun obiettivo per '+monthName(st.ym)+'.</span><button class="lnk band-l" data-goal="'+st.ym+'">Imposta obiettivo</button></div>')
     +(p?'<div class="row"><span>Giorni lavorativi</span><span class="num">'+p.el+' di '+p.tot+'</span></div>':'')
     +'</div></section>';
 }
@@ -1099,7 +1106,7 @@ function drawActivity0(kind){
   const val=d=>vals[d];
   const isWd=d=>{const w=new Date(yy,mm-1,d).getDay();return w>0&&(w<6||S.settings.sabato)};
   const days=[];for(let d=1;d<=N;d++)if(isWd(d)||val(d)>0)days.push(d);
-  let T0=0,tl='';if(kind==='lead'){const g=callGoal();if(S.settings.callsDay>0){T0=S.settings.callsDay;tl='Obiettivo'}else if(g.v){T0=g.v;tl='Media di '+monthName(ymAdd(ymOf(today()),-1))}}
+  let T0=0,tl='';if(kind==='lead'){const g=callGoal();if(callsOf(ym)>0){T0=callsOf(ym);tl='Obiettivo'}else if(g.v){T0=g.v;tl='Media di '+monthName(ymAdd(ymOf(today()),-1))}}
   const W=Math.max(box.clientWidth,260), H=180, L=30,R=6,T=14,B=24;
   const vmax=Math.max(T0,...days.map(val),kind==='lead'?5:3)*1.18, step=Math.max(1,niceStep(vmax/3)), ymax=Math.ceil(vmax/step)*step;
   const bw=(W-L-R)/days.length, y=v=>T+(1-v/ymax)*(H-T-B);
@@ -1122,7 +1129,7 @@ function drawActivity0(kind){
 
 function drawChart(){
   const box=$('#chart');if(!box)return;
-  const st=stats(ym), p=projection(st), N=daysIn(ym), goal=S.settings.goal, tot=workdays(ym);
+  const st=stats(ym), p=projection(st), N=daysIn(ym), goal=goalOf(ym), tot=workdays(ym);
   const lastDay=ym===ymOf(today())?+today().slice(8):(ym<ymOf(today())?N:0);
   const per=new Array(N+1).fill(0); st.sales.forEach(s=>{per[+s.date.slice(8)]+=earn(s)});
   const cum=[0];for(let d=1;d<=N;d++)cum[d]=cum[d-1]+per[d];
@@ -1681,6 +1688,22 @@ function pipeEditorHTML(kind){
      +(!s.sys&&!used(s.id)?'<button type="button" data-rm="'+i+'" aria-label="Elimina fase">×</button>':'<button type="button" disabled title="'+(s.sys?'Fase usata dalle automazioni':'Ci sono schede in questa fase')+'">×</button>')+'</span></div>').join('')
    +'</div><div class="row-end" style="margin-top:12px"><button type="button" class="btn ghost" data-padd="'+kind+'">+ Aggiungi fase</button><button type="button" class="btn ghost" data-preset="'+kind+'">Ripristina</button><button type="button" class="btn" data-psave="'+kind+'">Salva fasi</button></div></section>';
 }
+function goalMonths(){const c=ymOf(today()),set=new Set();for(let k=-2;k<=3;k++)set.add(ymAdd(c,k));Object.keys(S.settings.goals||{}).forEach(m=>set.add(m));set.add(ym);return [...set].sort()}
+function goalsHTML(){const s=S.settings,cur=ymOf(today());
+  return '<section class="card"><div class="card-h"><h2>Obiettivi per mese</h2><span class="note">Vuoto = usa lo standard</span></div><div class="goalt">'
+   +'<div class="gh"><span>Mese</span><span>Guadagno (CHF)</span><span>Chiamate al giorno</span></div>'
+   +goalMonths().map(m=>{const r=goalRec(m);return '<div class="gr'+(m===cur?' cur':'')+'"><b>'+cap(monthName(m))+' '+m.slice(0,4)+(m===cur?' <small>in corso</small>':'')+'</b>'
+     +'<input type="number" min="0" step="50" inputmode="numeric" data-gm="'+m+'" data-gf="goal" value="'+(r.goal!=null&&r.goal!==''?r.goal:'')+'" placeholder="'+(s.goal?grp(s.goal):'—')+'" aria-label="Obiettivo di guadagno di '+monthName(m)+'">'
+     +'<input type="number" min="0" step="1" inputmode="numeric" data-gm="'+m+'" data-gf="callsDay" value="'+(r.callsDay!=null&&r.callsDay!==''?r.callsDay:'')+'" placeholder="'+(s.callsDay||'—')+'" aria-label="Chiamate al giorno di '+monthName(m)+'"></div>'}).join('')
+   +'</div><div class="row-end" style="margin-top:12px"><button type="button" class="btn" id="goals-save">Salva obiettivi</button></div></section>'}
+function readGoals(root){const g={...(S.settings.goals||{})};
+  root.querySelectorAll('[data-gm]').forEach(i=>{const m=i.dataset.gm,f=i.dataset.gf,v=i.value.trim(),o={...(g[m]||{})};if(v==='')delete o[f];else o[f]=Math.max(0,Math.round(+v));if(Object.keys(o).length)g[m]=o;else delete g[m]});return g}
+function openGoal(m){const r=goalRec(m),s=S.settings;
+  sheet('<div class="sheet-h"><h2>Obiettivo <span>'+monthName(m)+' '+m.slice(0,4)+'</span></h2><button class="x" data-close aria-label="Chiudi">×</button></div>'
+   +'<form id="gs-f" style="display:flex;flex-direction:column;gap:14px"><div class="f"><label for="gs-g">Guadagno del mese (CHF)</label><input type="number" id="gs-g" min="0" step="50" inputmode="numeric" data-gm="'+m+'" data-gf="goal" value="'+(r.goal!=null&&r.goal!==''?r.goal:'')+'" placeholder="Standard: '+(s.goal?chf(s.goal):'nessuno')+'"></div>'
+   +'<div class="f"><label for="gs-c">Chiamate al giorno</label><input type="number" id="gs-c" min="0" step="1" inputmode="numeric" data-gm="'+m+'" data-gf="callsDay" value="'+(r.callsDay!=null&&r.callsDay!==''?r.callsDay:'')+'" placeholder="Standard: '+(s.callsDay||'nessuno')+'"><span class="h">Lascia vuoto per usare lo standard delle Impostazioni.</span></div>'
+   +'<div class="row-end"><button type="button" class="btn ghost" data-close>Annulla</button><button class="btn" type="submit">Salva</button></div></form>',
+  ov=>{ov.querySelector('#gs-f').onsubmit=async e=>{e.preventDefault();const goals=readGoals(ov);closeSheet();await put('settings','main',{...S.settings,goals});toast('Obiettivo di '+monthName(m)+' salvato.')}})}
 function srcEditorHTML(){
   if(!SRD)SRD=sourcesList().map(s=>({old:s,name:s,mode:srcMonthly(s)?'mese':'campagna'}));
   const cnt=s=>cardsOf('lead').filter(c=>sameSrc(c.src,s)).length;
@@ -1719,10 +1742,11 @@ function renderSet(){
    +'<section class="card"><div class="card-h"><h2>Guadagno e obiettivi</h2></div><form id="set-form" class="set">'
    +'<div class="f"><label for="s-on">Tua percentuale sulle chiusure da lead</label><input type="number" id="s-on" min="0" max="100" step="0.5" value="'+s.pctOnline+'"></div>'
    +'<div class="f"><label for="s-di">Tua percentuale sulle chiusure da contatti diretti</label><input type="number" id="s-di" min="0" max="100" step="0.5" value="'+s.pctDiretta+'"></div>'
-   +'<div class="f"><label for="s-goal">Obiettivo di guadagno mensile (CHF)</label><input type="number" id="s-goal" min="0" step="50" inputmode="numeric" value="'+(s.goal||'')+'" placeholder="Es. 1500"><span class="h">Conta tutte le chiusure, lead e contatti diretti.</span></div>'
-   +'<div class="f"><label for="s-calls">Obiettivo chiamate al giorno</label><input type="number" id="s-calls" min="0" step="1" inputmode="numeric" value="'+(s.callsDay||'')+'" placeholder="Es. 30"><span class="h">Senza obiettivo si usa la media del mese precedente.</span></div>'
+   +'<div class="f"><label for="s-goal">Obiettivo di guadagno standard (CHF al mese)</label><input type="number" id="s-goal" min="0" step="50" inputmode="numeric" value="'+(s.goal||'')+'" placeholder="Es. 1500"><span class="h">Vale per i mesi senza un obiettivo proprio. Conta tutte le chiusure, lead e contatti diretti.</span></div>'
+   +'<div class="f"><label for="s-calls">Obiettivo chiamate al giorno standard</label><input type="number" id="s-calls" min="0" step="1" inputmode="numeric" value="'+(s.callsDay||'')+'" placeholder="Es. 30"><span class="h">Senza obiettivo si usa la media del mese precedente.</span></div>'
    +'<div class="f"><span class="lbl">Giorni lavorativi</span><label class="chk"><input type="checkbox" id="s-sab"'+(s.sabato?' checked':'')+'> Lavoro anche il sabato</label></div>'
    +'<div class="row-end" style="grid-column:1/-1"><button class="btn" type="submit">Salva impostazioni</button></div></form></section>'
+   +goalsHTML()
    +srcEditorHTML()+pipeEditorHTML('lead')+reasonsHTML('lead')+pipeEditorHTML('dir')+reasonsHTML('dir')
    +'<section class="card"><div class="card-h"><h2>Come si calcola</h2></div><div class="howto">'
    +'<p><b>Guadagno:</b> '+s.pctOnline+'% sul margine delle chiusure da lead e '+s.pctDiretta+'% su quelle dei contatti diretti, sommati nello stesso obiettivo.</p>'
@@ -1761,6 +1785,7 @@ function bindSet(){
   if(sf)sf.onsubmit=e=>{e.preventDefault();const n=v=>Math.max(0,+v||0);
     put('settings','main',{...S.settings,pctOnline:n($('#s-on').value),pctDiretta:n($('#s-di').value),goal:n($('#s-goal').value),sabato:$('#s-sab').checked,callsDay:Math.round(n($('#s-calls').value))});toast('Impostazioni salvate.')};
   m.querySelectorAll('[data-theme-set]').forEach(b=>b.onclick=()=>{setTheme(b.dataset.themeSet);renderView()});
+  const gsv=$('#goals-save');if(gsv)gsv.onclick=async()=>{const goals=readGoals($('#main'));await put('settings','main',{...S.settings,goals});toast('Obiettivi salvati.')};
 }
 
 /* ---------- eventi della pagina ---------- */
@@ -1769,6 +1794,7 @@ function bindMain(){
   m.querySelectorAll('[data-sub]').forEach(b=>b.onclick=()=>{SUB[view]=b.dataset.sub;renderView();window.scrollTo(0,0)});
   m.querySelectorAll('[data-sub-go]').forEach(b=>b.onclick=()=>{SUB[view]=b.dataset.subGo;renderView();window.scrollTo(0,0)});
   const r=$('#resume');if(r)r.onclick=()=>resumeSession();
+  m.querySelectorAll('[data-goal]').forEach(b=>b.onclick=()=>openGoal(b.dataset.goal));
   m.querySelectorAll('[data-dismiss]').forEach(b=>b.onclick=()=>{const d=lsGet(DISM)||{};Object.keys(d).forEach(k=>{if(d[k]!==today())delete d[k]});d[b.dataset.dismiss]=today();lsSet(DISM,d);renderView();toast('Avviso nascosto fino a domani.')});
   const ns=$('#new-ses');if(ns)ns.onclick=()=>openSessTimes(null);
   m.querySelectorAll('[data-editday]').forEach(b=>b.onclick=()=>openDay(b.dataset.editday));
