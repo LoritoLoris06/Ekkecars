@@ -440,7 +440,7 @@ select{background:var(--surface)}
 .rem .rx:hover{color:var(--ink)}
 .rem.more-r{padding:10px 14px;font-weight:600}
 .srcf .chs{margin-bottom:8px}.srcf .h{font-size:13px;color:var(--muted)}
-.kc .sr{display:block;font-size:11px;font-weight:500;color:var(--muted);margin-top:2px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.kc .ksrc{display:block;font-size:11px;font-weight:500;color:var(--muted);margin-top:2px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 
 .srcrow{display:flex;gap:8px;align-items:center;margin-bottom:8px}.srcrow input{flex:1;min-width:0}.srcrow small{color:var(--muted);font-size:12px;white-space:nowrap}
 .srcrow .x2{min-height:44px;min-width:44px;border:1px solid var(--line);background:var(--surface);color:var(--ko);font-size:20px;cursor:pointer}
@@ -1193,7 +1193,7 @@ function renderBoard(kind){
     if(q)list=list.filter(c=>normName(c.name).includes(q));
     let more=0;if(s.lvl===5){const old=list.filter(c=>c.closure&&daysBetween(c.closure.date,today())>45);more=old.length;list=list.filter(c=>!old.includes(c))}
     h+='<section class="col'+(/^x\d$/.test(s.sys||'')?' narrow':'')+'" data-drop="'+s.id+'" style="--c:'+s.color+'"><header><b>'+esc(s.name)+'</b><span class="num">'+all+'</span></header><div class="cards">'
-      +list.map(c=>'<button class="kc" data-card="'+esc(c.id)+'" style="--c:'+s.color+';background:'+tint(s.color)+'">'+esc(c.name)+(kind==='lead'&&c.src&&!srcF?'<span class="sr">'+esc(c.src)+'</span>':'')+(c.closure?'<small>'+chf(earn({margine:c.closure.margine,channel:kind==='lead'?'online':'diretta'}))+'</small>':'')+(c.remind?'<small class="'+(c.remind<=Date.now()?'due':'')+'">'+cap(dayShort(isoOf(new Date(c.remind)))).replace(/ \S+$/,'')+' '+hhmm(c.remind)+'</small>':'')+'</button>').join('')
+      +list.map(c=>'<button class="kc" data-card="'+esc(c.id)+'" style="--c:'+s.color+';background:'+tint(s.color)+'">'+esc(c.name)+(kind==='lead'&&c.src&&!srcF?'<span class="ksrc">'+esc(c.src)+'</span>':'')+(c.closure?'<small>'+chf(earn({margine:c.closure.margine,channel:kind==='lead'?'online':'diretta'}))+'</small>':'')+(c.remind?'<small class="'+(c.remind<=Date.now()?'due':'')+'">'+cap(dayShort(isoOf(new Date(c.remind)))).replace(/ \S+$/,'')+' '+hhmm(c.remind)+'</small>':'')+'</button>').join('')
       +(more?'<span class="more">+ '+more+' chiuse da più di 45 giorni</span>':'')+(!all?'<span class="drop-hint">Vuota</span>':'')+'</div></section>'});
   h+='</div>';
   const negs=stagesOf(kind).filter(s=>s.neg);
@@ -1296,7 +1296,7 @@ function openCard(id){
    +(K==='lead'?srcPickerHTML('cd',c.src,'Fonte'):'')
    +'<div class="f"><span class="lbl" id="cd-nl">Note</span><div id="cd-nbox"></div></div>'
    +'<div class="f"><label for="cd-st">Sposta in</label><select id="cd-st">'+opts+'</select></div>'
-   +'<div class="row-end">'+(K==='dir'?'<button type="button" class="btn ghost ko-t" id="cd-del" style="margin-right:auto">Elimina scheda</button>':'')+'<button type="button" class="btn ghost" data-close>Chiudi</button><button class="btn" type="submit">Salva</button></div>'
+   +'<div class="row-end">'+(K==='dir'?'<button type="button" class="btn ghost ko-t" id="cd-del" style="margin-right:auto">Elimina scheda</button>':(!c.closure?'<button type="button" class="btn ghost" id="cd-call" style="margin-right:auto">Chiama ora</button>':''))+'<button type="button" class="btn ghost" data-close>Chiudi</button><button class="btn" type="submit">Salva</button></div>'
    +'<div id="cd-conf"></div>'+callsH+'<div class="hist-mini"><span class="lbl">Storia della scheda</span><ul class="tl">'+histH+'</ul></div></form>',
   ov=>{
     bindSrcPicker(ov,'cd');
@@ -1326,6 +1326,7 @@ function openCard(id){
     ov.querySelectorAll('[data-delmove]').forEach(b=>b.onclick=async()=>{closeSheet();await del('moves',b.dataset.delmove);toast('Spostamento annullato.')});
     const r=ov.querySelector('#cd-reason');if(r)r.onclick=()=>{const m=S.moves[c.neg.mid];reasonSheet(K,stageOf(K,c.neg.stage),c.name,c.neg,async(reason,rnote)=>{await put('moves',c.neg.mid,{...m,reason,rnote});toast('Motivo aggiornato.')})};
     const cl=ov.querySelector('#cd-clos');if(cl)cl.onclick=()=>{const m=S.moves[c.closure.mid];closureSheet(c,c.closure,async(auto,margine)=>{await put('moves',c.closure.mid,{...m,auto,margine});toast('Chiusura aggiornata.')})};
+    const cc=ov.querySelector('#cd-call');if(cc)cc.onclick=()=>{closeSheet();callLeadNow(engine().cards[id]||c)};
     const d=ov.querySelector('#cd-del');if(d)d.onclick=()=>{const x=ov.querySelector('#cd-conf');x.innerHTML='<div class="conf"><span>Eliminare la scheda e tutta la sua storia?</span><span class="row-end"><button type="button" class="btn ghost" id="cdn">No</button><button type="button" class="btn ko" id="cdy">Sì, elimina</button></span></div>';
       x.querySelector('#cdn').onclick=()=>{x.innerHTML=''};x.querySelector('#cdy').onclick=async()=>{closeSheet();for(const [mid,m] of Object.entries(S.moves))if(m.kind==='dir'&&m.ref===c.key)await del('moves',mid);await del('cards',c.key);toast('Scheda eliminata.')}};
   });
@@ -1374,11 +1375,13 @@ function renderReminders(){
   box.querySelectorAll('[data-remoff]').forEach(b=>b.onclick=()=>{const o=lsGet(REMK)||{};o[b.dataset.remoff]=1;lsSet(REMK,o);renderReminders()});
   box.querySelectorAll('[data-remcard]').forEach(b=>b.onclick=()=>openCard(b.dataset.remcard));
   box.querySelectorAll('[data-remcall]').forEach(b=>b.onclick=()=>{const c=engine().cards[b.dataset.remcall];if(!c)return;
-    const o=lsGet(REMK)||{};o[c.key+'@'+c.remind]=1;lsSet(REMK,o);renderReminders();
-    if(!SS){if(lsGet(DRAFT))resumeSession();else startSession()}
-    if(SS&&SS.phase==='work'&&SS.cur.step==='start'){SS.cur.name=c.name;SS.cur.lid=c.key.startsWith('u:')?c.key:null;saveDraft();renderSession()}});
+    const o=lsGet(REMK)||{};o[c.key+'@'+c.remind]=1;lsSet(REMK,o);renderReminders();callLeadNow(c)});
 }
 setInterval(renderReminders,30000);
+function callLeadNow(c){ // apre la sessione con nome e fonte del lead già compilati
+  if(!SS){if(lsGet(DRAFT))resumeSession();else startSession()}
+  if(SS&&SS.phase==='work'&&SS.cur.step==='start'){SS.cur.name=c.name;SS.cur.lid=c.key.startsWith('u:')?c.key:null;SS.cur.src=c.src||'';SS.cur.srcAutoKey=c.key;SS.cur.srcTouched=false;saveDraft();renderSession()}
+  else toast('Finisci prima la chiamata in corso.')}
 
 /* ---------- storico lead ---------- */
 const LCOLS=[['contattati','Chiamate'],['risposti','Risposte'],['interessati','Interessati'],['validi','Validi'],['proposte','Offerte'],['trattative','Leasing']];
@@ -1902,9 +1905,10 @@ function leadCardHTML(l){const a=l.lastAns,n=l.calls.length;
 function knownOf(c){const q=normName(c.name);if(!q)return null;const L=knownLeads();
   if(c.lid){const l=L.find(x=>x.key===c.lid);if(l)return l}
   const ex=L.filter(l=>normName(l.name)===q);return ex.length===1?ex[0]:null}
-function autoSrc(c){if(c.srcTouched)return;const l=knownOf(c);const cd=l&&engine().cards['lead|'+l.key];let v=cd?cd.src:'';
-  if(SS&&l)SS.items.forEach(it=>{if(leadKey(it)===l.key&&tidy(it.src))v=tidy(it.src)});
-  if(v&&v!==c.src){c.src=v;return true}return false}
+function autoSrc(c,force){const l=knownOf(c);if(!l)return false;if(c.srcTouched&&c.srcAutoKey===l.key&&!force)return false;
+  const cd=engine().cards['lead|'+l.key];let v=cd?cd.src:'';
+  if(SS)SS.items.forEach(it=>{if(leadKey(it)===l.key&&tidy(it.src))v=tidy(it.src)});
+  c.srcAutoKey=l.key;if(v&&v!==c.src){c.src=v;c.srcTouched=false;return true}return false}
 function refreshSrc(){const b=$('#c-srcbox');if(b){b.innerHTML=srcPickerHTML('c',SS.cur.src);bindSrcPicker($('.sess'),'c',v=>{SS.cur.src=v;SS.cur.srcTouched=true;saveDraft()})}}
 function matchHTML(c){
   const q=normName(c.name);if(!q)return '';
@@ -1988,7 +1992,7 @@ function editSessionItem(i){
 function bindMatch(){
   const box=$('#c-match');if(!box)return;
   box.querySelectorAll('[data-a]').forEach(b=>b.onclick=()=>act(b.dataset.a));
-  box.querySelectorAll('[data-pick]').forEach(b=>b.onclick=()=>{const l=knownLeads().find(x=>x.key===b.dataset.pick);if(!l)return;SS.cur.lid=l.key;SS.cur.name=l.name;autoSrc(SS.cur);saveDraft();renderSession()});
+  box.querySelectorAll('[data-pick]').forEach(b=>b.onclick=()=>{const l=knownLeads().find(x=>x.key===b.dataset.pick);if(!l)return;SS.cur.lid=l.key;SS.cur.name=l.name;autoSrc(SS.cur,true);saveDraft();renderSession()});
 }
 function bindSession(){
   const el=$('.sess');
