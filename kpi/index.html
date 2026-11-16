@@ -450,6 +450,8 @@ select{background:var(--surface)}
 .newsrc{display:flex;flex-direction:column;gap:6px;margin-top:8px}
 .newsrc[hidden]{display:none}
 .btn.numko{color:var(--ko);border-color:var(--ko)}
+.ped-h{margin:0 0 12px;font-size:13px;color:var(--muted)}.pname{position:relative;display:block;min-width:0}.pname input{width:100%;padding-right:30px}.psys{position:absolute;right:10px;top:50%;transform:translateY(-50%);color:var(--muted);font-size:14px;pointer-events:none}
+.pneg.is-neg{color:var(--ko);border-color:var(--ko);font-weight:600}
 .goalt{display:flex;flex-direction:column;gap:8px}.goalt .gh,.goalt .gr{display:grid;grid-template-columns:minmax(0,1.2fr) minmax(0,1fr) minmax(0,1fr);gap:10px;align-items:center}
 .goalt .gh span{font-size:12px;font-weight:600;color:var(--muted)}.goalt .gr b{font-weight:600}.goalt .gr small{display:block;font-size:11px;font-weight:600;color:var(--orange)}.goalt input{min-width:0;width:100%}
 .band .lnk.band-l{color:inherit;margin-left:8px;font-size:inherit}
@@ -1682,11 +1684,12 @@ function sessionRates(ymX){
 let PED=null, SRD=null; // bozza dell'editor delle fasi
 function pipeEditorHTML(kind){
   const list=PED[kind], used=id=>cardsOf(kind).some(c=>c.stage===id)||Object.values(S.moves).some(m=>m.kind===kind&&m.to===id);
-  return '<section class="card"><div class="card-h"><h2>Fasi · '+KIND_LBL[kind]+'</h2><span class="note">Nome, colore, ordine e cosa conta</span></div><div class="ped" data-kind="'+kind+'">'
+  return '<section class="card"><div class="card-h"><h2>Fasi · '+KIND_LBL[kind]+'</h2><span class="note">Nome, colore, ordine, cosa conta e se è positiva o negativa</span></div>'
+   +'<p class="h ped-h">Puoi modificare tutte le fasi. Quelle con <b>⚙</b> sono usate dalle automazioni della sessione: le chiamate continuano a spostare le schede lì, anche se le rinomini o cambi impostazioni. Una fase <b>negativa</b> chiede il motivo e manda la scheda in Non conclusi.</p><div class="ped" data-kind="'+kind+'">'
    +list.map((s,i)=>'<div class="pr'+(s.neg?' neg':'')+'"><input type="color" value="'+s.color+'" data-f="color" data-i="'+i+'" aria-label="Colore di '+esc(s.name)+'">'
-     +'<input type="text" value="'+esc(s.name)+'" data-f="name" data-i="'+i+'" aria-label="Nome della fase">'
-     +'<select data-f="lvl" data-i="'+i+'"'+(s.sys?' disabled':'')+' aria-label="Conta come">'+LVL_LBL.map((l,k)=>'<option value="'+k+'"'+(s.lvl===k?' selected':'')+'>'+(k?'Conta come '+l.toLowerCase():l)+'</option>').join('')+'</select>'
-     +'<label class="chk"><input type="checkbox" data-f="neg" data-i="'+i+'"'+(s.neg?' checked':'')+(s.sys?' disabled':'')+'> Negativa</label>'
+     +'<span class="pname"><input type="text" value="'+esc(s.name)+'" data-f="name" data-i="'+i+'" aria-label="Nome della fase">'+(s.sys?'<span class="psys" title="Usata dalle automazioni della sessione">⚙</span>':'')+'</span>'
+     +'<select data-f="lvl" data-i="'+i+'" aria-label="Conta come">'+LVL_LBL.map((l,k)=>'<option value="'+k+'"'+(s.lvl===k?' selected':'')+'>'+(k?'Conta come '+l.toLowerCase():l)+'</option>').join('')+'</select>'
+     +'<select data-f="neg" data-i="'+i+'" class="pneg'+(s.neg?' is-neg':'')+'" aria-label="Positiva o negativa"><option value="0"'+(s.neg?'':' selected')+'>Positiva</option><option value="1"'+(s.neg?' selected':'')+'>Negativa</option></select>'
      +'<span class="pbt"><button type="button" data-mv="-1" data-i="'+i+'" aria-label="Sposta su">↑</button><button type="button" data-mv="1" data-i="'+i+'" aria-label="Sposta giù">↓</button>'
      +(!s.sys&&!used(s.id)?'<button type="button" data-rm="'+i+'" aria-label="Elimina fase">×</button>':'<button type="button" disabled title="'+(s.sys?'Fase usata dalle automazioni':'Ci sono schede in questa fase')+'">×</button>')+'</span></div>').join('')
    +'</div><div class="row-end" style="margin-top:12px"><button type="button" class="btn ghost" data-padd="'+kind+'">+ Aggiungi fase</button><button type="button" class="btn ghost" data-preset="'+kind+'">Ripristina</button><button type="button" class="btn" data-psave="'+kind+'">Salva fasi</button></div></section>';
@@ -1762,7 +1765,7 @@ function bindSet(){
   const m=$('#main');
   m.querySelectorAll('.ped').forEach(box=>{const kind=box.dataset.kind;
     box.addEventListener('input',e=>{const t=e.target,i=+t.dataset.i;if(isNaN(i))return;const st=PED[kind][i];
-      if(t.dataset.f==='name')st.name=t.value;else if(t.dataset.f==='color')st.color=t.value;else if(t.dataset.f==='lvl')st.lvl=+t.value;else if(t.dataset.f==='neg'){st.neg=t.checked;if(st.neg)st.color=NEG;renderView()}});
+      if(t.dataset.f==='name')st.name=t.value;else if(t.dataset.f==='color')st.color=t.value;else if(t.dataset.f==='lvl')st.lvl=+t.value;else if(t.dataset.f==='neg'){st.neg=t.value==='1';if(st.neg){if(st.color!==NEG)st._pc=st.color;st.color=NEG}else if(st.color===NEG)st.color=st._pc||'#8C867C';renderView()}});
     box.addEventListener('click',e=>{const b=e.target.closest('button');if(!b||b.disabled)return;
       if(b.dataset.mv){const i=+b.dataset.i,j=i+ +b.dataset.mv,L=PED[kind];if(j<0||j>=L.length)return;[L[i],L[j]]=[L[j],L[i]];renderView()}
       if(b.dataset.rm){PED[kind].splice(+b.dataset.rm,1);renderView()}});
@@ -1770,8 +1773,9 @@ function bindSet(){
   m.querySelectorAll('[data-padd]').forEach(b=>b.onclick=()=>{PED[b.dataset.padd].splice(PED[b.dataset.padd].length-1,0,{id:uid('f'),name:'Nuova fase',color:'#8C867C',lvl:0});renderView()});
   m.querySelectorAll('[data-preset]').forEach(b=>b.onclick=()=>{const k=b.dataset.preset;const keep=STAGE_DEF[k].map(x=>x.id);
     PED[k]=JSON.parse(JSON.stringify(STAGE_DEF[k])).concat(PED[k].filter(x=>!keep.includes(x.id)&&cardsOf(k).some(c=>c.stage===x.id)));renderView();toast('Fasi originali ripristinate: premi Salva fasi per confermare.')});
-  m.querySelectorAll('[data-psave]').forEach(b=>b.onclick=async()=>{const k=b.dataset.psave,L=PED[k].map(x=>({...x,name:tidy(x.name)||'Fase'}));
-    if(!L.some(x=>x.lvl===5&&!x.neg)){toast('Serve almeno una fase di chiusura.');return}
+  m.querySelectorAll('[data-psave]').forEach(b=>b.onclick=async()=>{const k=b.dataset.psave,L=PED[k].map(x=>{const o={...x,name:tidy(x.name)||'Fase'};delete o._pc;if(!o.neg)delete o.neg;return o});
+    if(!L.some(x=>x.lvl===5&&!x.neg)){toast('Serve almeno una fase positiva che conta come chiusura.');return}
+    if(!L.some(x=>!x.neg&&x.lvl<5)){toast('Serve almeno una fase positiva aperta, prima della chiusura.');return}
     await put('settings','main',{...S.settings,pipes:{...(S.settings.pipes||{}),[k]:L}});PED[k]=JSON.parse(JSON.stringify(L));toast('Fasi '+(k==='lead'?'dei lead':'dei contatti diretti')+' salvate.')});
   m.querySelectorAll('[data-rsave]').forEach(b=>b.onclick=async()=>{const k=b.dataset.rsave,r={...((S.settings.reasons||{})[k]||{})};
     m.querySelectorAll('[data-rk="'+k+'"]').forEach(t=>{r[t.dataset.rs]=t.value.split('\n').map(tidy).filter(x=>x&&x.toLowerCase()!=='altro')});
